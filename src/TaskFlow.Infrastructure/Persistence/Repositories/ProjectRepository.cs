@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Abstractions;
 using TaskFlow.Domain.Projects;
 
@@ -11,4 +12,7 @@ public sealed class ProjectRepository(TaskFlowDbContext context) : IProjectRepos
 
         await context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<Project?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        await context.Projects.AsNoTracking().SingleOrDefaultAsync(project => project.Id == id, cancellationToken);
 }

@@ -8,7 +8,8 @@ namespace TaskFlow.Api.Controllers;
 [Route("api/projects")]
 [Tags("Projects")]
 public sealed class ProjectsController(
-    CreateProjectHandler handler,
+    CreateProjectHandler createHandler,
+    GetProjectByIdHandler getByIdHandler,
     ILogger<ProjectsController> logger) : ControllerBase
 {
     [HttpPost]
@@ -18,7 +19,7 @@ public sealed class ProjectsController(
         CreateProjectRequest request,
         CancellationToken cancellationToken)
     {
-        var project = await handler.HandleAsync(
+        var project = await createHandler.HandleAsync(
             new CreateProjectCommand(request.Name, request.Description),
             cancellationToken);
 
@@ -30,6 +31,22 @@ public sealed class ProjectsController(
             project.Description,
             project.CreatedAtUtc);
 
-        return Created($"/api/projects/{project.Id}", response);
+        return CreatedAtAction(nameof(GetByIdAsync), new { id = project.Id }, response);
+    }
+
+    [HttpGet("{id:guid}")]
+    [ActionName(nameof(GetByIdAsync))]
+    [ProducesResponseType<ProjectResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ProjectResponse>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var project = await getByIdHandler.HandleAsync(id, cancellationToken);
+
+        if (project is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new ProjectResponse(project.Id, project.Name, project.Description, project.CreatedAtUtc));
     }
 }

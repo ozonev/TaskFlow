@@ -7,8 +7,8 @@ using TaskFlow.Infrastructure;
 
 namespace TaskFlow.Tests.Api;
 
-public sealed class CreateProjectEndpointTests(TaskFlowApiFactory factory)
-    : IClassFixture<TaskFlowApiFactory>, IAsyncLifetime
+[Collection(ProjectsApiCollection.Name)]
+public sealed class CreateProjectEndpointTests(TaskFlowApiFactory factory) : IAsyncLifetime
 {
     private const string Url = "/api/projects";
 
@@ -42,7 +42,7 @@ public sealed class CreateProjectEndpointTests(TaskFlowApiFactory factory)
         Assert.Equal("First slice", project.Description);
         Assert.InRange(project.CreatedAtUtc, before.AddSeconds(-1), DateTime.UtcNow.AddSeconds(1));
 
-        Assert.Equal($"{Url}/{project.Id}", response.Headers.Location?.ToString());
+        Assert.Equal($"{Url}/{project.Id}", response.Headers.Location?.PathAndQuery);
     }
 
     [Fact]

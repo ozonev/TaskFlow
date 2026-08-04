@@ -22,6 +22,7 @@ builder.Services.AddDbContext<TaskFlowDbContext>(options => options.UseSqlite(co
 
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<CreateProjectHandler>();
+builder.Services.AddScoped<GetProjectByIdHandler>();
 
 builder.Services.AddHealthChecks();
 
