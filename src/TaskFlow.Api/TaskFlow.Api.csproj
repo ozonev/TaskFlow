@@ -9,6 +9,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
+    <!-- Design-time only: `dotnet ef` probes the startup project for this. PrivateAssets keeps
+         Roslyn and the MSBuild BuildHost trees out of the published output. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
