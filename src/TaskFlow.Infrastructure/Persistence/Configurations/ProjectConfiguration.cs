@@ -22,8 +22,9 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(project => project.Description)
             .HasMaxLength(Project.DescriptionMaxLength);
 
-        // SQLite stores DateTime as TEXT with no offset, so it reads back as Unspecified
-        // and would serialise without the trailing Z once a GET endpoint exists.
+        // Shared across providers: SQLite stores DateTime as TEXT with no offset, so it reads
+        // back as Unspecified without this. Npgsql already returns Utc for timestamptz, so the
+        // same conversion is a harmless no-op there rather than needing a provider branch.
         builder.Property(project => project.CreatedAtUtc)
             .IsRequired()
             .HasConversion(

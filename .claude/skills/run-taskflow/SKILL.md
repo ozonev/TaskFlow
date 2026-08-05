@@ -91,12 +91,17 @@ agent path when run without overriding `ASPNETCORE_ENVIRONMENT`, since
 ## Test
 
 ```powershell
-dotnet test
+dotnet test --filter-not-trait "Category=Postgres"    # fast/default: no Docker required
+dotnet test --filter-trait "Category=Postgres"        # escalated: requires a local Docker daemon
 dotnet test --filter-method "*Post_WithValidRequest_Returns201WithCreatedProject*"   # single test
 ```
 
-23 tests pass (endpoint integration tests via `WebApplicationFactory` +
-domain unit tests). Note: `--filter-method` matches the test **method** name,
+23 tests pass with no Docker (endpoint integration tests via `WebApplicationFactory` +
+domain unit tests, SQLite-backed). One additional test, tagged
+`[Trait("Category", "Postgres")]`, spins up a real PostgreSQL container via
+Testcontainers to prove concurrent-connection behavior the SQLite fixture can't —
+it needs Docker running locally and is excluded from `smoke.ps1`'s `dotnet test`
+call for that reason. Note: `--filter-method` matches the test **method** name,
 not the controller action it exercises — `*CreateAsync*` (the action name)
 matches zero tests; use the `[Fact]`/`[Theory]` method name instead. Also note
 `--nologo` is a VSTest flag — this repo's runner is Microsoft.Testing.Platform

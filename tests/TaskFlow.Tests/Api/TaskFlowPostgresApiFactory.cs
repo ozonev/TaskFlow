@@ -1,27 +1,33 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TaskFlow.Infrastructure;
+using TaskFlow.Infrastructure.Migrations.Postgres;
+using Testcontainers.PostgreSql;
 
 namespace TaskFlow.Tests.Api;
 
 /// <summary>
-/// Hosts the real API against a SQLite in-memory database. The connection is opened here and
-/// held for the fixture's lifetime because SQLite discards an in-memory database as soon as its
-/// last connection closes.
+/// Hosts the real API against a real PostgreSQL container, so tests can exercise genuine
+/// connection-pool/concurrency behavior the SQLite fixture's single held-open connection cannot.
 /// </summary>
-public sealed class TaskFlowApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class TaskFlowPostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly SqliteConnection _connection = new("DataSource=:memory:");
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
+        .Build();
+
+    private string _connectionString = string.Empty;
 
     public async ValueTask InitializeAsync()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        await _connection.OpenAsync(cancellationToken);
+        // Must finish before the first access to Services below: ConfigureWebHost reads this
+        // field synchronously once WebApplicationFactory lazily builds the host on that access.
+        await _container.StartAsync(cancellationToken);
+        _connectionString = _container.GetConnectionString();
 
         // Migrate rather than EnsureCreated, so each run also proves the committed migration applies.
         using var scope = Services.CreateScope();
@@ -37,19 +43,21 @@ public sealed class TaskFlowApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseEnvironment("Testing");
 
         // Satisfies the startup connection-string check; the registration below replaces it anyway.
-        builder.UseSetting("ConnectionStrings:DefaultConnection", "DataSource=:memory:");
+        builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost");
 
         builder.ConfigureTestServices(services =>
         {
             TaskFlowDbContextTestRegistration.RemoveDefaultRegistration(services);
 
-            services.AddDbContext<TaskFlowDbContext>(options => options.UseSqlite(_connection));
+            services.AddDbContext<TaskFlowDbContext>(options => options.UseNpgsql(
+                _connectionString,
+                npgsql => npgsql.MigrationsAssembly(PostgresMigrationsAssembly.Name)));
         });
     }
 
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
-        await _connection.DisposeAsync();
+        await _container.DisposeAsync();
     }
 }

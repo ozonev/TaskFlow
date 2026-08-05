@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Abstractions;
 using TaskFlow.Application.Projects;
 using TaskFlow.Infrastructure;
+using TaskFlow.Infrastructure.Migrations.Postgres;
 using TaskFlow.Infrastructure.Persistence.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,7 +19,27 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException(
         "Missing connection string 'ConnectionStrings:DefaultConnection'.");
 
-builder.Services.AddDbContext<TaskFlowDbContext>(options => options.UseSqlite(connectionString));
+// Validated eagerly, like the connection-string check above, so a typo'd provider fails at boot
+// instead of surfacing as a 500 on the first request that resolves TaskFlowDbContext.
+var databaseProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
+if (databaseProvider is not ("Sqlite" or "Postgres"))
+{
+    throw new InvalidOperationException(
+        $"Unknown DatabaseProvider '{databaseProvider}'. Expected 'Sqlite' or 'Postgres'.");
+}
+
+builder.Services.AddDbContext<TaskFlowDbContext>(options =>
+{
+    if (databaseProvider == "Postgres")
+    {
+        options.UseNpgsql(connectionString,
+            npgsql => npgsql.MigrationsAssembly(PostgresMigrationsAssembly.Name));
+    }
+    else
+    {
+        options.UseSqlite(connectionString);
+    }
+});
 
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<CreateProjectHandler>();

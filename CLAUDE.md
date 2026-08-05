@@ -19,7 +19,8 @@ Four-project Clean Architecture layering enforced only by `ProjectReference`s �
 - **Domain** — entities, value objects, domain logic. No project references, no framework packages. Keep it persistence- and transport-ignorant even though nothing currently stops adding EF Core or ASP.NET types here.
 - **Application** — use cases and the interfaces Infrastructure implements ("ports"), plus DTOs for use-case boundaries. References Domain only. Do not add EF Core or ASP.NET packages here even if convenient.
 - **Infrastructure** — EF Core (`TaskFlowDbContext`, DbSets, migrations, repository implementations), other outward integrations. References Domain + Application.
-- **Api** — composition root: DI wiring, minimal API endpoints, request/response mapping. References Application + Infrastructure. Endpoint handlers call into Application use cases; they must not touch `DbContext` or other Infrastructure types directly.
+- **Api** — composition root: DI wiring, minimal API endpoints, request/response mapping. References Application + Infrastructure, plus Infrastructure.Migrations.Postgres (needed so that satellite assembly is deployed alongside Api — `UseNpgsql(...).MigrationsAssembly(...)` resolves it by name at runtime). Endpoint handlers call into Application use cases; they must not touch `DbContext` or other Infrastructure types directly.
+- **Infrastructure.Migrations.Postgres** — an infra-tier satellite, not a fifth layer. Holds only the PostgreSQL migration set for `TaskFlowDbContext`; references Infrastructure only. Exists because EF Core resolves a DbContext's migrations/model snapshot by scanning one assembly, so two providers' migration histories can't coexist in the same assembly as SQLite's.
 
 ## Code comments
 
@@ -46,15 +47,23 @@ Four-project Clean Architecture layering enforced only by `ProjectReference`s �
 
 - `Microsoft.EntityFrameworkCore.Design` belongs in **`TaskFlow.Api`** (the startup project `dotnet ef` probes) with `PrivateAssets="all"`. Keep the `PrivateAssets` — without it the package is a normal runtime dependency and `dotnet publish` ships Roslyn, MSBuild, and the EF design-time assemblies with the app (measured: 62.7 MB vs 38.8 MB). Don't move it to Infrastructure; nothing there needs it.
 - `dotnet-ef` is pinned in the root `dotnet-tools.json` (the .NET 10 SDK's default manifest location, not `.config/`). Run `dotnet tool restore` once per clone.
-- Every `dotnet ef` command needs both project arguments, because the DbContext and the host that configures it live in different projects. `--project` is where migrations are written (Infrastructure); `--startup-project` is where the connection string and DI wiring come from (Api). Run them from the repo root:
+- Every `dotnet ef` command needs both project arguments, because the DbContext and the host that configures it live in different projects. `--project` is where migrations are written; `--startup-project` is where the connection string and DI wiring come from (Api). No custom `IDesignTimeDbContextFactory` exists — `dotnet ef` resolves `TaskFlowDbContext` by building Api's own `Program.cs` host (via `HostFactoryResolver`), so it honors the same `DatabaseProvider`/`ConnectionStrings__DefaultConnection` config the app reads at runtime. Run from the repo root:
   ```
+  # SQLite (default provider, no env vars needed)
   dotnet ef migrations add <Name> --project src/TaskFlow.Infrastructure --startup-project src/TaskFlow.Api
   dotnet ef database update       --project src/TaskFlow.Infrastructure --startup-project src/TaskFlow.Api
   dotnet ef database drop --force --project src/TaskFlow.Infrastructure --startup-project src/TaskFlow.Api
+
+  # PostgreSQL — same commands, targeting the satellite migrations project, with the provider switch set
+  $env:DatabaseProvider = "Postgres"
+  $env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5432;Database=taskflow;Username=postgres;Password=postgres"
+  dotnet ef migrations add <Name> --project src/TaskFlow.Infrastructure.Migrations.Postgres --startup-project src/TaskFlow.Api
+  dotnet ef database update       --project src/TaskFlow.Infrastructure.Migrations.Postgres --startup-project src/TaskFlow.Api
   ```
-  Omitting `--startup-project` makes the tooling fall back to `--project`, which has no configuration and fails.
+  Omitting `--startup-project` makes the tooling fall back to `--project`, which has no configuration and fails. Never run a Postgres-targeted command against `--project src/TaskFlow.Infrastructure` (or vice versa) — that would mix providers' migrations into the wrong assembly.
 - Always use migrations; don't reach for `EnsureCreated()` beyond throwaway local experiments. `Program.cs` also applies pending migrations on startup in Development, so `dotnet run` works on a clean clone — `database update` remains the explicit path and both apply the same migrations.
 - DbSets, query logic, and repository implementations belong in Infrastructure, not Application or Api. Entity mapping goes in `IEntityTypeConfiguration<T>` classes under `Persistence/Configurations` (picked up by `ApplyConfigurationsFromAssembly`), not attributes on Domain types.
+- Provider is chosen by the `DatabaseProvider` config key (`"Sqlite"` default, or `"Postgres"`), read once in `Program.cs`. SQLite needs no config; PostgreSQL needs `DatabaseProvider=Postgres` plus a real `ConnectionStrings__DefaultConnection` supplied externally (env var), never committed. `TaskFlowDbContext`, DbSets, and entity configurations are provider-agnostic — only the provider registration and the migration set differ.
 
 ## Async
 
@@ -64,6 +73,11 @@ Four-project Clean Architecture layering enforced only by `ProjectReference`s �
 
 - `tests/TaskFlow.Tests` references all four `src` projects from one test project — intentional, so tests for any layer belong there rather than a new test project per layer.
 - Endpoints are covered by real HTTP integration tests via `TaskFlowApiFactory` (`WebApplicationFactory<Program>`) against a SQLite in-memory database that the committed migrations are applied to. Reuse that fixture rather than standing up a new host per feature.
+- `TaskFlowPostgresApiFactory` is the escalated counterpart, backed by a real `Testcontainers.PostgreSql` container instead of SQLite's single held-open connection — use it only when a test needs behavior SQLite's fixture architecturally can't exercise (e.g. real concurrent-connection/pool semantics), not as a default. Tests using it are tagged `[Trait("Category", "Postgres")]` and require a local Docker daemon.
+  ```
+  dotnet test --filter-not-trait "Category=Postgres"   # default: fast, no Docker required
+  dotnet test --filter-trait "Category=Postgres"       # escalated: requires Docker running locally
+  ```
 - xUnit v3: pass `TestContext.Current.CancellationToken` to any async call that accepts one, or the xUnit1051 analyzer warns.
 
 ## Logging & security

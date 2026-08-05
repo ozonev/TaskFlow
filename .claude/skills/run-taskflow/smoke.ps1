@@ -93,7 +93,9 @@ try {
     # No --nologo here: this repo's test runner is Microsoft.Testing.Platform (see
     # global.json), not VSTest, and it rejects --nologo as an unknown option
     # (exit code 5) instead of ignoring it.
-    dotnet test
+    # Excludes Category=Postgres: those tests need a local Docker daemon (Testcontainers) and
+    # would otherwise fail this smoke run on any machine without Docker running.
+    dotnet test --filter-not-trait "Category=Postgres"
     if ($LASTEXITCODE -ne 0) { throw "dotnet test failed" }
 
     Write-Host "== ALL CHECKS PASSED =="
