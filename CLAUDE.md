@@ -33,7 +33,8 @@ Four-project Clean Architecture layering enforced only by `ProjectReference`s �
 - MVC controllers, not minimal API — `Program.cs` wires `AddControllers()`/`MapControllers()` and holds no routes. Don't reintroduce `MapGet`/`MapPost` route registrations for business endpoints (`/health` stays a minimal-API `MapHealthChecks`).
 - One `ControllerBase` per feature under `Controllers/`, attribute-routed (`[ApiController]`, `[Route("api/<resource>")]`). Dependencies come in through the primary constructor.
 - Actions stay thin: call an Application use case, map the result to a response DTO. No business logic or EF Core calls in the action body.
-- No `CreatedAtAction`/`CreatedAtRoute` pointing at a GET that doesn't exist yet — it throws at runtime. Use `Created($"/api/<resource>/{id}", response)` until the GET action is added.
+- No `CreatedAtAction`/`CreatedAtRoute` pointing at a GET that doesn't exist yet — it throws at runtime. Use `Created($"/api/<resource>/{id}", response)` until the GET action is added, then switch the POST/PUT action to `CreatedAtAction(nameof(<GetAction>), ...)`.
+- Any action targeted via `nameof(...)` for `CreatedAtAction`/`CreatedAtRoute` needs `[ActionName(nameof(<Method>))]` if the method name ends in `Async` — MVC strips the `Async` suffix from the route's action name by default, so `nameof(GetByIdAsync)` won't resolve without it and the request 500s at runtime.
 
 ## DTOs & validation
 
@@ -42,6 +43,7 @@ Four-project Clean Architecture layering enforced only by `ProjectReference`s �
 - `[ApiController]` runs DataAnnotations automatically and short-circuits with a 400 `ValidationProblemDetails` before the action body, so actions need no validation code.
 - Request DTOs are records with **init accessors, not positional parameters**, so the accessor can normalise (trim) before validation runs. On a positional record MVC requires validation attributes on the constructor parameter and throws `InvalidOperationException` at request time if it finds them on the property — which rules out normalising accessors. (Minimal API's `AddValidation()` requires the exact opposite; if this project ever moves back, every DTO has to flip.)
 - Length limits on DTOs reference the Domain constants (`[MaxLength(Project.NameMaxLength)]`), never a literal — otherwise lowering a domain limit leaves the API accepting input the domain then rejects with a 500.
+- Reuse existing response/Application DTOs (e.g. `ProjectResponse`, `ProjectDto`) across actions on the same resource instead of creating a new shape per endpoint, unless the response genuinely needs different fields.
 
 ## EF Core
 
@@ -72,7 +74,8 @@ Four-project Clean Architecture layering enforced only by `ProjectReference`s �
 ## Testing
 
 - `tests/TaskFlow.Tests` references all four `src` projects from one test project — intentional, so tests for any layer belong there rather than a new test project per layer.
-- Endpoints are covered by real HTTP integration tests via `TaskFlowApiFactory` (`WebApplicationFactory<Program>`) against a SQLite in-memory database that the committed migrations are applied to. Reuse that fixture rather than standing up a new host per feature.
+- Endpoints are covered by real HTTP integration tests via `TaskFlowApiFactory` (`WebApplicationFactory<Program>`) against a SQLite in-memory database that the committed migrations are applied to. When a second test class covers the same resource, share one host via an xUnit collection fixture (`[CollectionDefinition]`/`ICollectionFixture<TaskFlowApiFactory>`, see `ProjectsApiCollection`) rather than `IClassFixture<TaskFlowApiFactory>` on each class — the latter still spins up a separate host per class.
+- New endpoints need integration tests for both their success path and their primary failure path (400 validation, 404 not found, etc.) — a happy-path-only suite is incomplete.
 - `TaskFlowPostgresApiFactory` is the escalated counterpart, backed by a real `Testcontainers.PostgreSql` container instead of SQLite's single held-open connection — use it only when a test needs behavior SQLite's fixture architecturally can't exercise (e.g. real concurrent-connection/pool semantics), not as a default. Tests using it are tagged `[Trait("Category", "Postgres")]` and require a local Docker daemon.
   ```
   dotnet test --filter-not-trait "Category=Postgres"   # default: fast, no Docker required
