@@ -9,6 +9,7 @@ paths:
 - One `ControllerBase` per feature under `Controllers/`, attribute-routed (`[ApiController]`, `[Route("api/<resource>")]`). Dependencies come in through the primary constructor.
 - Actions stay thin: call an Application use case, map the result to a response DTO. No business logic or EF Core calls in the action body.
 - No `CreatedAtAction`/`CreatedAtRoute` pointing at a GET that doesn't exist yet — it throws at runtime. Use `Created($"/api/<resource>/{id}", response)` until the GET action is added, then switch the POST/PUT action to `CreatedAtAction(nameof(<GetAction>), ...)`.
+- `Created(string, ...)` sets a **relative** `Location` header (just the path), unlike `CreatedAtAction`, which builds an absolute URL. `Uri.PathAndQuery` throws `InvalidOperationException` on a relative `Uri` — tests asserting the header on a `Created(...)` response must use `response.Headers.Location?.OriginalString` instead.
 - Any action targeted via `nameof(...)` for `CreatedAtAction`/`CreatedAtRoute` needs `[ActionName(nameof(<Method>))]` if the method name ends in `Async` — MVC strips the `Async` suffix from the route's action name by default, so `nameof(GetByIdAsync)` won't resolve without it and the request 500s at runtime.
 
 ## DTOs & validation
