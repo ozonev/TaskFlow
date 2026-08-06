@@ -1,0 +1,25 @@
+[
+  {"query": "Add PUT /api/projects/{id} to update a project's name and description. Acceptance: 200 with the updated project on success, 404 if the project doesn't exist, 400 if name is empty.", "should_trigger": true},
+  {"query": "Implement DELETE /api/projects/{id}. Acceptance: 204 on success, 404 if the project doesn't exist.", "should_trigger": true},
+  {"query": "Add GET /api/projects/{id}/tasks to list tasks under a project. Acceptance: 200 with an array (empty if none), 404 if the project doesn't exist.", "should_trigger": true},
+  {"query": "Add POST /api/tasks to create a task under a project. Acceptance: 201 with the created task and Location header, 400 if title is missing or projectId doesn't reference an existing project.", "should_trigger": true},
+  {"query": "Implement PATCH /api/tasks/{id}/complete to mark a task done. Acceptance: 200 with the updated task, 404 if not found, 409 if already completed.", "should_trigger": true},
+  {"query": "Add an endpoint to search projects by name, GET /api/projects?search=. Acceptance: 200 with matching projects, empty array if none match, case-insensitive match.", "should_trigger": true},
+  {"query": "Here's the ticket brief: add GET /api/tasks/{id} returning 200 with the task or 404. Please plan and implement the vertical slice.", "should_trigger": true},
+  {"query": "Add a DELETE /api/tasks/{id} endpoint. Acceptance: 204 on success, 404 if the task doesn't exist, and it must not allow deleting a task that belongs to a different project than the one in the route.", "should_trigger": true},
+  {"query": "Implement POST /api/projects/{id}/archive. Acceptance: 200 with the archived project, 404 if not found, 409 if already archived.", "should_trigger": true},
+  {"query": "Add GET /api/projects with pagination (page, pageSize query params). Acceptance: 200 with a page of projects and a total count, 400 for invalid page/pageSize.", "should_trigger": true},
+
+  {"query": "Go read Jira ticket TASK-142 and tell me what it says.", "should_trigger": false},
+  {"query": "Pull the acceptance criteria from our Jira board for the next sprint.", "should_trigger": false},
+  {"query": "Build the React page that lists projects and lets you click into one.", "should_trigger": false},
+  {"query": "Style the task list component to match the new design mockups.", "should_trigger": false},
+  {"query": "Set up a GitHub Actions workflow to deploy the Api project to Azure App Service.", "should_trigger": false},
+  {"query": "Add a Docker Compose file so Postgres and the Api run together locally.", "should_trigger": false},
+  {"query": "We should probably let users search across projects and tasks at some point — any ideas?", "should_trigger": false},
+  {"query": "Fix the bug where GetProjectById returns 500 instead of 404 when the project doesn't exist.", "should_trigger": false},
+  {"query": "Add an index on Project.Name for query performance.", "should_trigger": false},
+  {"query": "Update CLAUDE.md to document the new Postgres migrations workflow.", "should_trigger": false},
+  {"query": "Review this PR diff and flag any security issues.", "should_trigger": false},
+  {"query": "Write integration tests for the existing CreateProject endpoint — no behavior change needed.", "should_trigger": false}
+]
