@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Abstractions;
 using TaskFlow.Application.Projects;
+using TaskFlow.Application.Tasks;
 using TaskFlow.Infrastructure;
 using TaskFlow.Infrastructure.Migrations.Postgres;
 using TaskFlow.Infrastructure.Persistence.Repositories;
@@ -44,6 +45,9 @@ builder.Services.AddDbContext<TaskFlowDbContext>(options =>
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectByIdHandler>();
+
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<CreateTaskHandler>();
 
 builder.Services.AddHealthChecks();
 
