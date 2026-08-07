@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Abstractions;
 using TaskFlow.Domain.TaskItems;
 
@@ -11,4 +12,7 @@ public sealed class TaskRepository(TaskFlowDbContext context) : ITaskRepository
 
         await context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken) =>
+        await context.Tasks.AnyAsync(task => task.Id == id, cancellationToken);
 }

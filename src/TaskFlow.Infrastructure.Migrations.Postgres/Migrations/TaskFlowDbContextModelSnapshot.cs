@@ -44,6 +44,34 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                     b.ToTable("Projects", (string)null);
                 });
 
+            modelBuilder.Entity("TaskFlow.Domain.TaskComments.TaskComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskId");
+
+                    b.ToTable("Comments", (string)null);
+                });
+
             modelBuilder.Entity("TaskFlow.Domain.TaskItems.TaskItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -75,6 +103,15 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                     b.HasIndex("ProjectId");
 
                     b.ToTable("Tasks", (string)null);
+                });
+
+            modelBuilder.Entity("TaskFlow.Domain.TaskComments.TaskComment", b =>
+                {
+                    b.HasOne("TaskFlow.Domain.TaskItems.TaskItem", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TaskFlow.Domain.TaskItems.TaskItem", b =>

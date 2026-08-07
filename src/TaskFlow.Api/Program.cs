@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Abstractions;
+using TaskFlow.Application.Comments;
 using TaskFlow.Application.Projects;
 using TaskFlow.Application.Tasks;
 using TaskFlow.Infrastructure;
@@ -48,6 +49,10 @@ builder.Services.AddScoped<GetProjectByIdHandler>();
 
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<CreateTaskHandler>();
+
+builder.Services.AddScoped<ICommentRepository, CommentRepository>();
+builder.Services.AddScoped<CreateCommentHandler>();
+builder.Services.AddScoped<GetCommentsByTaskIdHandler>();
 
 builder.Services.AddHealthChecks();
 
