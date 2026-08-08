@@ -11,6 +11,7 @@ paths:
 - No `CreatedAtAction`/`CreatedAtRoute` pointing at a GET that doesn't exist yet — it throws at runtime. Use `Created($"/api/<resource>/{id}", response)` until the GET action is added, then switch the POST/PUT action to `CreatedAtAction(nameof(<GetAction>), ...)`.
 - `Created(string, ...)` sets a **relative** `Location` header (just the path), unlike `CreatedAtAction`, which builds an absolute URL. `Uri.PathAndQuery` throws `InvalidOperationException` on a relative `Uri` — tests asserting the header on a `Created(...)` response must use `response.Headers.Location?.OriginalString` instead.
 - Any action targeted via `nameof(...)` for `CreatedAtAction`/`CreatedAtRoute` needs `[ActionName(nameof(<Method>))]` if the method name ends in `Async` — MVC strips the `Async` suffix from the route's action name by default, so `nameof(GetByIdAsync)` won't resolve without it and the request 500s at runtime.
+- An `if (x is null) { return NotFound(); }` guard followed by a final `return Ok(...)` looks like IDE0046's "convert to conditional expression" target, but don't apply that fix here — the root `.editorconfig` silences IDE0046 for this directory specifically because `NotFound()`/`Ok(...)` are covariant `ActionResult<T>` subtypes, so the ternary only compiles with explicit casts and reads worse than the `if`/`return`.
 
 ## DTOs & validation
 

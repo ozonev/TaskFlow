@@ -52,4 +52,4 @@ Each finding should include:
 - why it matters
 - suggested fix
 
-Prioritize correctness and safety over style. Do not report cosmetic preferences unless they hide a real maintainability risk.
+Prioritize correctness and safety over style. Do not report cosmetic preferences unless they hide a real maintainability risk. Formatting, indentation, using-directive order, and IDE-style suggestions are already enforced by the root `.editorconfig` plus a `dotnet format` PostToolUse hook — don't flag those, including IDE0046 in `src/TaskFlow.Api/Controllers/**`, which `.editorconfig` deliberately silences there (the ternary fix needs `ActionResult<T>` casts and reads worse than the `if`/`return`).

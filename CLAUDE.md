@@ -42,6 +42,11 @@ Layer-specific conventions live next to the code they govern and load automatica
 - `.claude/rules/ef-core.md` — EF Core, migrations, provider setup (`src/TaskFlow.Infrastructure/**`, `src/TaskFlow.Infrastructure.Migrations.Postgres/**`).
 - `.claude/rules/api-endpoints.md` — controller and DTO conventions (`src/TaskFlow.Api/**`).
 
+## Formatting & style
+
+- `.editorconfig` at the repo root (based on the `dotnet new editorconfig` template, adjusted to match this codebase's actual conventions — see its comments for why) governs indentation, naming, and C# code-style rules. A `PostToolUse` hook (`.claude/hooks/format-edited-file.ps1`) runs `dotnet format` on every `.cs` file touched by Edit/Write/Bash/PowerShell, so files are reformatted automatically on save — don't hand-fix a style nit the hook will just override, and don't propose a `.editorconfig` change without checking it against real files first (a rule that conflicts with existing convention forces a mass reformat on next touch).
+- IDE0046 ("if statement can be simplified") is deliberately silenced for `src/TaskFlow.Api/Controllers/**`: MVC actions often return covariant `ActionResult<T>` subtypes across branches (`NotFound()` vs `Ok(...)`), so the ternary auto-fix only compiles by inserting explicit casts — worse than the `if`/`return` it replaces. Don't apply that rewrite by hand just because an IDE flags it.
+
 ## Code comments
 
 - Don't comment what the code already says. No restating a method name in prose, no narrating each line, no scaffold leftovers like `// Add services to the container.` or `// Learn more about configuring OpenAPI at https://...` — delete those on sight when touching the file.
@@ -68,6 +73,10 @@ Layer-specific conventions live next to the code they govern and load automatica
 - Secrets/connection strings belong in configuration (`appsettings*.json`, user-secrets, or env vars) — never hardcoded in source. `DefaultConnection` is only in `appsettings.Development.json`, so any other environment must supply it (e.g. `ConnectionStrings__DefaultConnection`); `Program.cs` throws at startup if it's missing rather than letting `UseSqlite(null)` open an anonymous temp database that 500s on first use.
 - `AddProblemDetails()` + `UseExceptionHandler()` are wired, so unhandled exceptions return `application/problem+json` instead of an empty body. Development still shows the developer exception page (stack traces, absolute paths) — that's local-only and intentional.
 - `/health` is unauthenticated by design; don't attach business data or auth to it without discussion.
+
+## Protected paths
+
+`.claude/settings.json` denies `Edit`/`Write` on secrets/deployment-credential paths (`.env*`, `appsettings.Production.json`, `*.pfx`, `*.publishsettings`, `*.pubxml`, `PublishScripts/**`). This only constrains those two tools — `Bash`/`PowerShell` can still write these paths via shell redirection, so it's not a substitute for keeping real secrets out of the repo entirely.
 
 ## Adding dependencies
 
