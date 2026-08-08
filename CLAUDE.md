@@ -80,7 +80,7 @@ Layer-specific conventions live next to the code they govern and load automatica
 
 ## Adding dependencies
 
-- Ask before adding a NuGet package — there's no version pinning or CI to catch an unreviewed dependency's footprint automatically.
+- Ask before adding a NuGet package. Central Package Management (`Directory.Packages.props`) and restore-time NuGet audit (`Directory.Build.props`) mechanically catch version drift and known CVEs, but not license terms, a package's maintenance health, or whether it's justified in the first place — that's still a judgment call. Every new dependency touches two files (a `<PackageVersion>` in `Directory.Packages.props`, a `<PackageReference>` in the consuming project), so it's always a small, reviewable diff.
 
 ## Git
 
