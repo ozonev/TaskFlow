@@ -101,7 +101,11 @@ domain unit tests, SQLite-backed). One additional test, tagged
 `[Trait("Category", "Postgres")]`, spins up a real PostgreSQL container via
 Testcontainers to prove concurrent-connection behavior the SQLite fixture can't —
 it needs Docker running locally and is excluded from `smoke.ps1`'s `dotnet test`
-call for that reason. Note: `--filter-method` matches the test **method** name,
+call for that reason. Before running it, confirm the local Docker engine (Rancher
+Desktop, Docker Desktop, etc.) is actually up (`docker info` shows a `Server:`
+section, not just `Client:`) — if it isn't, `TaskFlowPostgresApiFactory` now fails
+fast with a plain-English error telling you to start Docker, instead of a raw
+Testcontainers stack trace. Note: `--filter-method` matches the test **method** name,
 not the controller action it exercises — `*CreateAsync*` (the action name)
 matches zero tests; use the `[Fact]`/`[Theory]` method name instead. Also note
 `--nologo` is a VSTest flag — this repo's runner is Microsoft.Testing.Platform

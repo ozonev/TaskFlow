@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Builders;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -15,10 +16,28 @@ namespace TaskFlow.Tests.Api;
 /// </summary>
 public sealed class TaskFlowPostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
-        .Build();
+    private readonly PostgreSqlContainer _container;
 
     private string _connectionString = string.Empty;
+
+    public TaskFlowPostgresApiFactory()
+    {
+        try
+        {
+            // Build() validates Docker reachability synchronously, so a not-running engine
+            // surfaces here rather than later in InitializeAsync's StartAsync call.
+            _container = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        }
+        catch (DockerUnavailableException ex)
+        {
+            // Fail with plain instructions instead of surfacing Testcontainers' raw
+            // DockerUnavailableException/AggregateException stack trace.
+            throw new InvalidOperationException(
+                "Postgres-tagged tests need a local Docker engine running (e.g. Rancher Desktop or " +
+                "Docker Desktop). Start it, wait for `docker info` to show a Server section, then " +
+                "re-run: dotnet test --filter-trait \"Category=Postgres\"", ex);
+        }
+    }
 
     public async ValueTask InitializeAsync()
     {
