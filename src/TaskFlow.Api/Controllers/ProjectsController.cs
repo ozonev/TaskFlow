@@ -11,8 +11,23 @@ public sealed class ProjectsController(
     CreateProjectHandler createHandler,
     GetProjectByIdHandler getByIdHandler,
     UpdateProjectHandler updateHandler,
+    ListProjectsHandler listHandler,
     ILogger<ProjectsController> logger) : ControllerBase
 {
+    [HttpGet]
+    [ProducesResponseType<ProjectListResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ProjectListResponse>> ListAsync(
+        [FromQuery] ListProjectsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await listHandler.HandleAsync(
+            new ListProjectsQuery(request.Page, request.PageSize),
+            cancellationToken);
+
+        return Ok(ToListResponse(result));
+    }
+
     [HttpPost]
     [ProducesResponseType<ProjectResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -73,4 +88,11 @@ public sealed class ProjectsController(
         project.Name,
         project.Description,
         project.CreatedAtUtc);
+
+    private static ProjectListResponse ToListResponse(ListProjectsResult result) => new(
+        result.Items.Select(ToResponse).ToArray(),
+        result.Page,
+        result.PageSize,
+        result.TotalCount,
+        result.TotalPages);
 }

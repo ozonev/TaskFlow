@@ -23,4 +23,8 @@ public interface IProjectRepository
     /// no SQL if nothing is actually modified.
     /// </summary>
     Task SaveChangesAsync(CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Project>> ListAsync(int skip, int take, CancellationToken cancellationToken);
+
+    Task<int> CountAsync(CancellationToken cancellationToken);
 }

@@ -21,4 +21,15 @@ public sealed class ProjectRepository(TaskFlowDbContext context) : IProjectRepos
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken) =>
         await context.SaveChangesAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Project>> ListAsync(int skip, int take, CancellationToken cancellationToken) =>
+        await context.Projects.AsNoTracking()
+            .OrderBy(project => project.CreatedAtUtc)
+            .ThenBy(project => project.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+    public async Task<int> CountAsync(CancellationToken cancellationToken) =>
+        await context.Projects.CountAsync(cancellationToken);
 }
