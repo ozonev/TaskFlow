@@ -46,6 +46,7 @@ builder.Services.AddDbContext<TaskFlowDbContext>(options =>
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectByIdHandler>();
+builder.Services.AddScoped<UpdateProjectHandler>();
 
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<CreateTaskHandler>();

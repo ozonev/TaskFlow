@@ -1,8 +1,4 @@
 {
-  "enabledPlugins": {
-    "csharp-lsp@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true
-  },
   "permissions": {
     "deny": [
       "Edit(**/.env)",
@@ -34,5 +30,10 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "csharp-lsp@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "atlassian@claude-plugins-official": true
   }
 }

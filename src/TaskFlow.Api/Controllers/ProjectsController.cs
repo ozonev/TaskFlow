@@ -10,6 +10,7 @@ namespace TaskFlow.Api.Controllers;
 public sealed class ProjectsController(
     CreateProjectHandler createHandler,
     GetProjectByIdHandler getByIdHandler,
+    UpdateProjectHandler updateHandler,
     ILogger<ProjectsController> logger) : ControllerBase
 {
     [HttpPost]
@@ -25,13 +26,7 @@ public sealed class ProjectsController(
 
         logger.LogInformation("Created project {ProjectId}.", project.Id);
 
-        var response = new ProjectResponse(
-            project.Id,
-            project.Name,
-            project.Description,
-            project.CreatedAtUtc);
-
-        return CreatedAtAction(nameof(GetByIdAsync), new { id = project.Id }, response);
+        return CreatedAtAction(nameof(GetByIdAsync), new { id = project.Id }, ToResponse(project));
     }
 
     [HttpGet("{id:guid}")]
@@ -47,6 +42,35 @@ public sealed class ProjectsController(
             return NotFound();
         }
 
-        return Ok(new ProjectResponse(project.Id, project.Name, project.Description, project.CreatedAtUtc));
+        return Ok(ToResponse(project));
     }
+
+    [HttpPatch("{id:guid}")]
+    [ProducesResponseType<ProjectResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ProjectResponse>> UpdateAsync(
+        Guid id,
+        UpdateProjectRequest request,
+        CancellationToken cancellationToken)
+    {
+        var project = await updateHandler.HandleAsync(
+            new UpdateProjectCommand(id, request.Name, request.Description),
+            cancellationToken);
+
+        if (project is null)
+        {
+            return NotFound();
+        }
+
+        logger.LogInformation("Updated project {ProjectId}.", project.Id);
+
+        return Ok(ToResponse(project));
+    }
+
+    private static ProjectResponse ToResponse(ProjectDto project) => new(
+        project.Id,
+        project.Name,
+        project.Description,
+        project.CreatedAtUtc);
 }

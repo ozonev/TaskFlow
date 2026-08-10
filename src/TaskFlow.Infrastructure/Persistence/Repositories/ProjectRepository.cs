@@ -15,4 +15,10 @@ public sealed class ProjectRepository(TaskFlowDbContext context) : IProjectRepos
 
     public async Task<Project?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         await context.Projects.AsNoTracking().SingleOrDefaultAsync(project => project.Id == id, cancellationToken);
+
+    public async Task<Project?> GetTrackedByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        await context.Projects.SingleOrDefaultAsync(project => project.Id == id, cancellationToken);
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken) =>
+        await context.SaveChangesAsync(cancellationToken);
 }

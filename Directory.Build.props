@@ -1,0 +1,12 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Restore-time vulnerability scan against nuget.org's advisory feed (the implicit default
+         source — no NuGet.config exists). Explicit here rather than left to SDK defaults, so the
+         severity threshold is a documented, deliberate choice. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+  </PropertyGroup>
+
+</Project>
