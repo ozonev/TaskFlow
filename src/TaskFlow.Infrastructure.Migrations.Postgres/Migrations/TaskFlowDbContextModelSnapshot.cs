@@ -131,7 +131,9 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectId");
+                    b.HasIndex("CreatedAtUtc", "Id");
+
+                    b.HasIndex("ProjectId", "CreatedAtUtc", "Id");
 
                     b.ToTable("Tasks", (string)null);
                 });
