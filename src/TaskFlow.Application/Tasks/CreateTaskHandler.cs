@@ -1,9 +1,14 @@
 using TaskFlow.Application.Abstractions;
+using TaskFlow.Domain.AuditLogs;
 using TaskFlow.Domain.TaskItems;
 
 namespace TaskFlow.Application.Tasks;
 
-public sealed class CreateTaskHandler(ITaskRepository taskRepository, IProjectRepository projectRepository)
+public sealed class CreateTaskHandler(
+    ITaskRepository taskRepository,
+    IProjectRepository projectRepository,
+    IAuditLogRepository auditLogRepository,
+    IUnitOfWork unitOfWork)
 {
     public async Task<TaskDto?> HandleAsync(CreateTaskCommand command, CancellationToken cancellationToken)
     {
@@ -15,7 +20,17 @@ public sealed class CreateTaskHandler(ITaskRepository taskRepository, IProjectRe
 
         var task = TaskItem.Create(command.ProjectId, command.Title, command.Description, command.DueDate);
 
-        await taskRepository.AddAsync(task, cancellationToken);
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            await taskRepository.AddAsync(task, ct);
+
+            var auditLog = AuditLog.Create(
+                task.ProjectId,
+                task.Id,
+                AuditEventType.TaskCreated,
+                $"Task '{task.Title}' created.");
+            await auditLogRepository.AddAsync(auditLog, ct);
+        }, cancellationToken);
 
         return new TaskDto(task.Id, task.ProjectId, task.Title, task.Description, task.Status, task.DueDate, task.CreatedAtUtc);
     }

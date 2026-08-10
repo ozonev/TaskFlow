@@ -8,4 +8,12 @@ public interface ITaskRepository
     Task AddAsync(TaskItem task, CancellationToken cancellationToken);
 
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<int> CountAsync(TaskSearchFilter filter, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<TaskItem>> SearchAsync(
+        TaskSearchFilter filter,
+        int skip,
+        int take,
+        CancellationToken cancellationToken);
 }
