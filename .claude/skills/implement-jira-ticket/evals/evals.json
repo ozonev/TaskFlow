@@ -1,0 +1,18 @@
+[
+  {"query": "Implement TASKFLOW-42.", "should_trigger": true},
+  {"query": "Work on ticket TASKFLOW-7 and get it PR-ready.", "should_trigger": true},
+  {"query": "Pick up PROJ-101 and implement it end to end.", "should_trigger": true},
+  {"query": "Here's a Jira ticket key, TASKFLOW-15 — build the feature it describes.", "should_trigger": true},
+  {"query": "Take TASKFLOW-3 from ticket to PR summary.", "should_trigger": true},
+
+  {"query": "Is TASKFLOW-42 a duplicate of an existing bug?", "should_trigger": false},
+  {"query": "Search Jira for similar issues to this error message.", "should_trigger": false},
+  {"query": "What does TASKFLOW-42 say? Just summarize it for me.", "should_trigger": false},
+  {"query": "Add PUT /api/projects/{id} to update a project's name and description. Acceptance: 200 with the updated project on success, 404 if the project doesn't exist, 400 if name is empty.", "should_trigger": false},
+  {"query": "Create a Jira ticket for this bug I just found.", "should_trigger": false},
+  {"query": "Generate a status report for the TASKFLOW project this sprint.", "should_trigger": false},
+  {"query": "Add a comment to TASKFLOW-42 with my findings.", "should_trigger": false},
+  {"query": "Move TASKFLOW-42 to Done.", "should_trigger": false},
+  {"query": "Build the React page that lists projects and lets you click into one.", "should_trigger": false},
+  {"query": "Review this PR diff and flag any security issues.", "should_trigger": false}
+]
