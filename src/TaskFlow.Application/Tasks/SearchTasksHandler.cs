@@ -8,7 +8,9 @@ public sealed class SearchTasksHandler(ITaskRepository repository)
     {
         var totalCount = await repository.CountAsync(query.Filter, cancellationToken);
 
-        var skip = (long)(query.Page) * query.PageSize;
+        // Computed as long: (Page - 1) * PageSize overflows Int32 for validation-legal but huge
+        // Page values, which would wrap negative and make Skip silently clamp back to 0.
+        var skip = (long)(query.Page - 1) * query.PageSize;
 
         IReadOnlyList<TaskDto> items;
         if (skip >= totalCount)
