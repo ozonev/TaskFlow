@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Abstractions;
+using TaskFlow.Application.AuditLogs;
 using TaskFlow.Application.Comments;
 using TaskFlow.Application.Projects;
 using TaskFlow.Application.Tasks;
 using TaskFlow.Infrastructure;
 using TaskFlow.Infrastructure.Migrations.Postgres;
+using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Persistence.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -48,13 +50,20 @@ builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectByIdHandler>();
 builder.Services.AddScoped<UpdateProjectHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
+builder.Services.AddScoped<GetProjectAuditLogHandler>();
 
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<CreateTaskHandler>();
+builder.Services.AddScoped<SearchTasksHandler>();
 
 builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 builder.Services.AddScoped<CreateCommentHandler>();
 builder.Services.AddScoped<GetCommentsByTaskIdHandler>();
+
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<GetTaskAuditLogHandler>();
+
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddHealthChecks();
 

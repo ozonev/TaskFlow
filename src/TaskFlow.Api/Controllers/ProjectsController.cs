@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using TaskFlow.Api.AuditLogs;
 using TaskFlow.Api.Projects;
+using TaskFlow.Application.AuditLogs;
 using TaskFlow.Application.Projects;
 
 namespace TaskFlow.Api.Controllers;
@@ -12,6 +14,7 @@ public sealed class ProjectsController(
     GetProjectByIdHandler getByIdHandler,
     UpdateProjectHandler updateHandler,
     ListProjectsHandler listHandler,
+    GetProjectAuditLogHandler getAuditLogHandler,
     ILogger<ProjectsController> logger) : ControllerBase
 {
     [HttpGet]
@@ -81,6 +84,23 @@ public sealed class ProjectsController(
         logger.LogInformation("Updated project {ProjectId}.", project.Id);
 
         return Ok(ToResponse(project));
+    }
+
+    [HttpGet("{id:guid}/audit")]
+    [ProducesResponseType<IReadOnlyList<AuditLogResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<AuditLogResponse>>> GetAuditAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var auditLogs = await getAuditLogHandler.HandleAsync(id, cancellationToken);
+
+        if (auditLogs is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(auditLogs.Select(AuditLogResponse.FromDto).ToArray());
     }
 
     private static ProjectResponse ToResponse(ProjectDto project) => new(

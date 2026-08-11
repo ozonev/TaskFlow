@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore TaskFlow.slnx
+
+      - name: Build
+        run: dotnet build TaskFlow.slnx --configuration Release --no-restore
+
+      - name: Check for supported test reporter
+        id: reporter
+        shell: bash
+        run: |
+          if grep -rlE "Microsoft\.Testing\.Extensions\.TrxReport|JunitXml\.TestLogger" tests/**/*.csproj > /dev/null 2>&1; then
+            echo "has-reporter=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-reporter=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test
+        run: >
+          dotnet test TaskFlow.slnx --configuration Release --no-build
+          --filter-not-trait "Category=Postgres"
+          ${{ steps.reporter.outputs.has-reporter == 'true' && '--report-trx --results-directory ./TestResults' || '' }}
+
+      - name: Publish test results
+        if: always() && steps.reporter.outputs.has-reporter == 'true'
+        uses: dorny/test-reporter@v3
+        with:
+          name: Test Results
+          path: 'TestResults/*.trx'
+          reporter: dotnet-trx
