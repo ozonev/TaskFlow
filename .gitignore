@@ -8,6 +8,9 @@
 *.db-shm
 *.db-wal
 
+# taskflow-agent build output
+tools/taskflow-agent/dist/
+
 # dotenv files
 .env
 
