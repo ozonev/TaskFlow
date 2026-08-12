@@ -18,11 +18,7 @@ export type JournalEvent =
   | 'verify.step'
   | 'verify.skipped';
 
-/**
- * Appends synchronously on every call. A Ctrl-C or a hard crash mid-run must
- * still leave a complete record up to that point, which a buffered writer would
- * lose, and the volume here (a few hundred lines) makes the cost irrelevant.
- */
+// Appends synchronously on every call. A Ctrl-C or a hard crash mid-run must still leave a complete record up to that point, which a buffered writer would lose, and the volume here (a few hundred lines) makes the cost irrelevant.
 export class Journal {
   private readonly file: string;
 

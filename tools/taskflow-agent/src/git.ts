@@ -85,11 +85,7 @@ export function isWorkingTreeClean(cwd: string): boolean {
   return git(['status', '--porcelain'], cwd) === '';
 }
 
-/**
- * Repo-relative paths from `git status --porcelain`. Each line is `XY <path>`,
- * with renames written as `old -> new` and paths quoted when they contain
- * unusual characters.
- */
+// Repo-relative paths from `git status --porcelain`. Each line is `XY <path>`, with renames written as `old -> new` and paths quoted when they contain unusual characters.
 export function parsePorcelain(stdout: string): string[] {
   return stdout
     .split(/\r?\n/)

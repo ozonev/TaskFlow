@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      taskflow-agent: ${{ steps.filter.outputs.taskflow-agent }}
     steps:
       - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v3
@@ -31,6 +32,8 @@ jobs:
               - 'Directory.Build.props'
               - 'Directory.Packages.props'
               - '.github/workflows/ci.yml'
+            taskflow-agent:
+              - 'tools/taskflow-agent/**'
 
   build-and-test:
     needs: changes
@@ -74,3 +77,30 @@ jobs:
           name: Test Results
           path: 'TestResults/*.trx'
           reporter: dotnet-trx
+
+  taskflow-agent-test:
+    needs: changes
+    if: needs.changes.outputs.taskflow-agent == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/taskflow-agent
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/taskflow-agent/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

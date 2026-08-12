@@ -109,13 +109,7 @@ function toolUsesOf(message: unknown): string[] {
     .map((block) => block.name);
 }
 
-/**
- * The SDK only reports total_cost_usd on result messages, and assistant messages
- * carry token counts with no price attached. Rather than bundle a price table
- * that would silently go stale, this reads a cost field wherever one happens to
- * appear and otherwise leaves enforcement to maxBudgetUsd, which the SDK applies
- * itself. So this is a backstop, not the primary limit.
- */
+// The SDK only reports total_cost_usd on result messages, and assistant messages carry token counts with no price attached. Rather than bundle a price table that would silently go stale, this reads a cost field wherever one happens to appear and otherwise leaves enforcement to maxBudgetUsd, which the SDK applies itself -- so this is a backstop, not the primary limit.
 function readCost(message: unknown): number | null {
   if (message === null || typeof message !== 'object') return null;
   const record = message as Record<string, unknown>;
@@ -126,10 +120,7 @@ function readCost(message: unknown): number | null {
   return null;
 }
 
-/**
- * Stands in for a run that threw before reporting a result, so the caller can
- * still verify and report on whatever the agent managed to change first.
- */
+// Stands in for a run that threw before reporting a result, so the caller can still verify and report on whatever the agent managed to change first.
 export function crashedOutcome(message: string, wallClockMs: number): RunOutcome {
   return {
     subtype: 'error_during_execution',
@@ -178,9 +169,7 @@ export async function runAgent(ctx: RunContext, journal: Journal): Promise<RunOu
 
     if (decision.allow) {
       gatePassed += 1;
-      // Deliberately no explicit 'allow': returning one would auto-approve and
-      // skip the permission layer, discarding the worktree's own deny rules.
-      // Passing the gate means "not refused here", not "approved".
+      // Deliberately no explicit 'allow': returning one would auto-approve and skip the permission layer, discarding the worktree's own deny rules. Passing the gate means "not refused here", not "approved".
       return {};
     }
 
@@ -210,9 +199,7 @@ export async function runAgent(ctx: RunContext, journal: Journal): Promise<RunOu
     permissionMode: mode === 'plan' ? 'plan' : 'default',
     allowedTools: allowedToolsFor(mode),
     disallowedTools: disallowedToolsFor(mode),
-    // 'local' is a separate source from 'project', so .claude/settings.local.json
-    // is excluded here, and 'user' is left out so the operator's own ~/.claude
-    // settings cannot widen a run.
+    // 'local' is a separate source from 'project', so .claude/settings.local.json is excluded here, and 'user' is left out so the operator's own ~/.claude settings cannot widen a run.
     settingSources: ['project'],
     systemPrompt: {
       type: 'preset',
@@ -256,9 +243,7 @@ export async function runAgent(ctx: RunContext, journal: Journal): Promise<RunOu
 
   try {
     for await (const message of query({ prompt: buildPrompt(ctx), options }) as AsyncIterable<SDKMessage>) {
-      // Probed on every message, not just assistant ones: the SDK reports cost on
-      // result messages today, and this way the backstop starts working for free
-      // if a mid-stream cost field ever appears.
+      // Probed on every message, not just assistant ones: the SDK reports cost on result messages today, and this way the backstop starts working for free if a mid-stream cost field ever appears.
       const cost = readCost(message);
       if (cost !== null) observedCost = cost;
 
@@ -323,8 +308,7 @@ export async function runAgent(ctx: RunContext, journal: Journal): Promise<RunOu
     }
   } catch (error) {
     if (aborted === null) throw error;
-    // An abort we asked for surfaces here as a rejection; the reason is already
-    // journaled, so swallow it and report through the outcome instead.
+    // An abort we asked for surfaces here as a rejection; the reason is already journaled, so swallow it and report through the outcome instead.
   } finally {
     clearTimeout(timer);
   }

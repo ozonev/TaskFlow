@@ -19,25 +19,20 @@ export interface VerifyResult {
 
 const STEP_TIMEOUT_MS = 15 * 60_000;
 
+// --no-restore/--no-build mirror the CI job's chaining: 'restore' and 'tool restore' cover different manifests (NuGet packages vs. local CLI tools), so build only needs to skip the former.
 const STEPS: Array<{ label: string; args: string[] }> = [
   { label: 'restore', args: ['restore'] },
   { label: 'tool restore', args: ['tool', 'restore'] },
-  { label: 'build', args: ['build'] },
-  // --nologo is deliberately absent: this repo's runner is Microsoft.Testing.Platform
-  // (see global.json), which rejects it as an unknown option instead of ignoring it.
-  // Category=Postgres needs a live Docker daemon, so it is excluded as it is in CI.
-  { label: 'test', args: ['test', '--filter-not-trait', 'Category=Postgres'] },
+  { label: 'build', args: ['build', '--no-restore'] },
+  // --nologo is deliberately absent: this repo's runner is Microsoft.Testing.Platform (see global.json), which rejects it as an unknown option instead of ignoring it. Category=Postgres needs a live Docker daemon, so it is excluded as it is in CI.
+  { label: 'test', args: ['test', '--no-build', '--filter-not-trait', 'Category=Postgres'] },
 ];
 
 function tailOf(text: string, lines = 25): string {
   return text.split(/\r?\n/).filter((line) => line.trim() !== '').slice(-lines).join('\n');
 }
 
-/**
- * Runs after the agent has stopped, from the host, with no agent involvement --
- * the model can neither skip these nor influence their result. Stops at the
- * first failure, since later steps would only report the same breakage.
- */
+// Runs after the agent has stopped, from the host, with no agent involvement -- the model can neither skip these nor influence their result. Stops at the first failure, since later steps would only report the same breakage.
 export function runVerification(worktree: string, journal: Journal): VerifyResult {
   const steps: VerifyStep[] = [];
 
@@ -52,9 +47,7 @@ export function runVerification(worktree: string, journal: Journal): VerifyResul
     });
     const durationMs = Date.now() - startedAt;
 
-    // spawnSync reports a timeout kill through result.error too, so a step that
-    // ran for the full 15 minutes and was killed must not be reported the same
-    // way as a dotnet binary that could not be launched at all.
+    // spawnSync reports a timeout kill through result.error too, so a step that ran for the full 15 minutes and was killed must not be reported the same way as a dotnet binary that could not be launched at all.
     const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT';
 
     if (result.error !== undefined && !timedOut) {

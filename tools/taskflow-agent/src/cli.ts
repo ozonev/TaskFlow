@@ -34,9 +34,7 @@ async function main(): Promise<ExitCodeValue> {
   }
   const args = parsed.args;
 
-  // Resolved before the journal exists because the journal lives in the repo.
-  // Local, read-only, and no network -- the approval check still precedes any
-  // API call.
+  // Resolved before the journal exists because the journal lives in the repo. Local, read-only, and no network -- the approval check still precedes any API call.
   const repoRoot = resolveRepoRoot(process.cwd());
   const artifactsDir = path.join(repoRoot, 'artifacts', args.runId);
   fs.mkdirSync(artifactsDir, { recursive: true });
@@ -66,10 +64,7 @@ async function main(): Promise<ExitCodeValue> {
 
   journal.append('run.input', { path: args.inputPath, sha256: ctx.inputSha, text: ctx.inputText });
 
-  // A throw here must not skip verification and the report: in execute mode the
-  // agent may already have changed files, and that partial change is exactly
-  // what needs measuring. The full stack goes to the journal, one readable line
-  // to the operator.
+  // A throw here must not skip verification and the report: in execute mode the agent may already have changed files, and that partial change is exactly what needs measuring. The full stack goes to the journal, one readable line to the operator.
   const agentStartedAt = Date.now();
   let outcome;
   let crashMessage: string | null = null;

@@ -42,7 +42,8 @@ export interface RunContext {
   approval: Approval | null;
 }
 
-const FALLBACK_PROTECTED = ['main', 'master'];
+// 'develop' and 'trunk' are the other two common default/integration-branch names alongside main/master; used only when origin/HEAD couldn't be read, so the fallback errs on the side of refusing a plausible default branch.
+const FALLBACK_PROTECTED = ['main', 'master', 'develop', 'trunk'];
 
 function readTextFile(file: string, label: string): string {
   let text: string;
@@ -107,12 +108,7 @@ function checkProtectedBranch(branch: string, repoRoot: string): { branch: strin
   return { branch: null, detected: false };
 }
 
-/**
- * A worktree nested inside the source checkout would put the parent repo inside
- * the jail, defeating the isolation the jail exists to provide. Checked for
- * reused worktrees as well as new ones -- a nested worktree left behind by an
- * earlier run is no safer for having existed already.
- */
+// A worktree nested inside the source checkout would put the parent repo inside the jail, defeating the isolation the jail exists to provide. Checked for reused worktrees as well as new ones -- a nested worktree left behind by an earlier run is no safer for having existed already.
 function requireOutsideSourceCheckout(args: ParsedArgs, repoRoot: string): void {
   if (samePath(args.worktree, repoRoot) || isInsideDir(args.worktree, repoRoot)) {
     throw new PreflightError(
@@ -170,11 +166,7 @@ export interface PreflightInputs {
   journal: Journal;
 }
 
-/**
- * Every refusal path throws PreflightError, so the caller maps them all to exit
- * 2 uniformly. Order matters: the approval check for `execute` runs before the
- * API key check so an unapproved plan is rejected without needing credentials.
- */
+// Every refusal path throws PreflightError, so the caller maps them all to exit 2 uniformly. Order matters: the approval check for `execute` runs before the API key check so an unapproved plan is rejected without needing credentials.
 export function runPreflight(inputs: PreflightInputs): RunContext {
   const { args, repoRoot, artifactsDir, journal } = inputs;
 
@@ -205,9 +197,7 @@ export function runPreflight(inputs: PreflightInputs): RunContext {
 
   checkApiKey();
 
-  // The runner's own artifacts live in the repo, so they are excluded here --
-  // otherwise writing the journal would make the tool fail its own clean check
-  // in any repo that does not happen to gitignore artifacts/.
+  // The runner's own artifacts live in the repo, so they are excluded here -- otherwise writing the journal would make the tool fail its own clean check in any repo that does not happen to gitignore artifacts/.
   const artifactsRoot = path.join(repoRoot, 'artifacts');
   const dirty = dirtyPaths(repoRoot).filter((rel) => {
     const absolute = path.resolve(repoRoot, rel);
@@ -237,9 +227,7 @@ export function runPreflight(inputs: PreflightInputs): RunContext {
     worktreeCreated = true;
   }
 
-  // Read after the worktree exists, and journalled from this value rather than
-  // from the source HEAD: `git worktree add <path> <existing-branch>` checks out
-  // that branch's tip, which need not be the source checkout's HEAD.
+  // Read after the worktree exists, and journalled from this value rather than the source HEAD: `git worktree add <path> <existing-branch>` checks out that branch's tip, which need not be the source checkout's HEAD.
   const worktreeHead = headSha(args.worktree);
   journal.append(worktreeCreated ? 'worktree.created' : 'worktree.reused', {
     worktree: args.worktree,
@@ -261,9 +249,7 @@ export function runPreflight(inputs: PreflightInputs): RunContext {
     };
     writeMeta(artifactsDir, meta);
   } else {
-    // Nothing in this tool commits, so a worktree HEAD that has moved off the
-    // recorded base means someone committed by hand -- the approval no longer
-    // describes the tree it would be applied to.
+    // Nothing in this tool commits, so a worktree HEAD that has moved off the recorded base means someone committed by hand -- the approval no longer describes the tree it would be applied to.
     if (worktreeHead !== approvedMeta.baseCommit) {
       throw new PreflightError(
         `${args.worktree} is no longer at the commit the plan was approved against.\n` +

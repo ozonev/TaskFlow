@@ -10,10 +10,7 @@ export interface Approval {
 export const PROPOSAL_FILENAME = 'plan.proposed.md';
 export const APPROVED_FILENAME = 'plan.approved.md';
 
-/**
- * Deliberately strict: the header is the entire approval boundary, so a
- * near-miss must fail rather than be generously interpreted.
- */
+// Deliberately strict: the header is the entire approval boundary, so a near-miss must fail rather than be generously interpreted.
 const HEADER = /^<!--\s*approved-by:\s*(\S.*?)\s+(\d{4}-\d{2}-\d{2})\s+base:\s*([0-9a-fA-F]{7,40})\s*-->$/;
 
 export function approvalHeaderExample(baseCommit: string): string {
@@ -40,10 +37,7 @@ export interface ApprovalCheck {
   baseCommit: string;
 }
 
-/**
- * The three ways an "approved" plan can turn out not to be one. Ordered so the
- * most likely operator mistake produces the most specific message.
- */
+// The three ways an "approved" plan can turn out not to be one. Ordered so the most likely operator mistake produces the most specific message.
 export function verifyApproval(check: ApprovalCheck): Approval {
   const { approvedPath, approvedText, proposedText, baseCommit } = check;
 

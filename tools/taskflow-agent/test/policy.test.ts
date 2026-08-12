@@ -93,6 +93,7 @@ describe('classifyCommand — denied', () => {
     ['dotnet build a/b/../../../../c.csproj', 'repeated mid-path parent segments'],
     ['dotnet build ..', 'a bare parent segment'],
     ['dotnet build src\\..\\..\\evil.csproj', 'a mid-path parent escape with backslashes'],
+    ['dotnet build C:..\\evil.csproj', 'a Windows drive-relative parent escape'],
     ['dotnet build ~/evil.csproj', 'a home-directory reference'],
     ['dotnet build "~/evil.csproj"', 'a quoted home-directory reference'],
     ['dotnet test --results-directory /tmp/out', 'an absolute path'],
@@ -259,6 +260,26 @@ describe('decide — the gate as a whole', () => {
   test('a shell call with no command is denied', () => {
     const jail = makeWorktree();
     assert.equal(decide({ mode: 'execute', worktree: jail }, 'Bash', { description: 'x' }).allow, false);
+  });
+
+  test('a Glob/Grep pattern cannot escape the worktree even with no path set', () => {
+    const jail = makeWorktree();
+    for (const tool of ['Glob', 'Grep'] as const) {
+      const decision = decide({ mode: 'plan', worktree: jail }, tool, { pattern: '../../../secret/**' });
+      assert.equal(decision.allow, false, `${tool} with a traversing pattern must be denied`);
+      assert.match(decision.reason, /parent directory/);
+    }
+  });
+
+  test('a Glob/Grep pattern with no traversal is still allowed with no path set', () => {
+    const jail = makeWorktree();
+    assert.ok(decide({ mode: 'plan', worktree: jail }, 'Glob', { pattern: '**/*.cs' }).allow);
+  });
+
+  test('an absolute Glob/Grep pattern is denied', () => {
+    const jail = makeWorktree();
+    const outside = process.platform === 'win32' ? 'C:\\Windows\\**' : '/etc/**';
+    assert.equal(decide({ mode: 'plan', worktree: jail }, 'Glob', { pattern: outside }).allow, false);
   });
 
   test('the host hook script cannot be overwritten in either mode', () => {
