@@ -21,7 +21,7 @@ repo root. Requires Node 20+ (developed on 22.14) and `ANTHROPIC_API_KEY`; the S
 Claude Code subscription login.
 
 ```
-npm test          # 206 tests, no network, no Docker, no API key needed
+npm test          # 212 tests, no network, no Docker, no API key needed
 npm run typecheck
 ```
 

@@ -78,6 +78,13 @@ after(() => {
   }
 });
 
+function makeBrief(artifactsDir: string, text = 'A hand-written brief.\n'): string {
+  const briefPath = path.join(artifactsDir, 'brief.md');
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  fs.writeFileSync(briefPath, text);
+  return briefPath;
+}
+
 describe('runPreflight — a fresh run-id', () => {
   test('plan with a hand-written brief needs no approval and records createdBy: plan', () => {
     const repoRoot = makeRepo();
@@ -85,15 +92,108 @@ describe('runPreflight — a fresh run-id', () => {
     const worktree = path.join(os.tmpdir(), `tfa-wt-${runId}`);
     tempRoots.push(worktree);
     const artifactsDir = path.join(repoRoot, 'artifacts', runId);
-    const briefPath = path.join(artifactsDir, 'brief.md');
-    fs.mkdirSync(artifactsDir, { recursive: true });
-    fs.writeFileSync(briefPath, 'A hand-written brief, never touched intake.\n');
+    const briefPath = makeBrief(artifactsDir, 'A hand-written brief, never touched intake.\n');
 
     const ctx = run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath }));
 
     assert.equal(ctx.approval, null);
     assert.equal(ctx.meta.createdBy, 'plan');
     assert.ok(fs.existsSync(path.join(artifactsDir, 'meta.json')), 'meta.json should have been written');
+  });
+});
+
+describe('runPreflight — protected branch', () => {
+  test('refuses when --branch matches the detected default branch (origin/HEAD)', () => {
+    const repoRoot = makeRepo();
+    // No real network remote needed: detectDefaultBranch only ever reads local ref files.
+    const defaultBranch = git(['rev-parse', '--abbrev-ref', 'HEAD'], repoRoot).trim();
+    git(['update-ref', `refs/remotes/origin/${defaultBranch}`, `refs/heads/${defaultBranch}`], repoRoot);
+    git(['symbolic-ref', 'refs/remotes/origin/HEAD', `refs/remotes/origin/${defaultBranch}`], repoRoot);
+
+    const runId = nextRunId();
+    const worktree = path.join(os.tmpdir(), `tfa-wt-${runId}`);
+    tempRoots.push(worktree);
+    const artifactsDir = path.join(repoRoot, 'artifacts', runId);
+    const briefPath = makeBrief(artifactsDir);
+
+    assert.throws(
+      () => run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath, branch: defaultBranch })),
+      (error) => error instanceof PreflightError && /is this repository's default branch/.test(error.message),
+    );
+  });
+
+  test('refuses a conventionally protected branch name when origin/HEAD cannot be detected', () => {
+    const repoRoot = makeRepo(); // no origin ref set up at all
+    const runId = nextRunId();
+    const worktree = path.join(os.tmpdir(), `tfa-wt-${runId}`);
+    tempRoots.push(worktree);
+    const artifactsDir = path.join(repoRoot, 'artifacts', runId);
+    const briefPath = makeBrief(artifactsDir);
+
+    assert.throws(
+      () => run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath, branch: 'main' })),
+      (error) => error instanceof PreflightError && /conventionally protected branch/.test(error.message),
+    );
+  });
+});
+
+describe('runPreflight — worktree placement and reuse', () => {
+  test('refuses a worktree nested inside the source checkout', () => {
+    const repoRoot = makeRepo();
+    const runId = nextRunId();
+    const worktree = path.join(repoRoot, 'nested-worktree');
+    const artifactsDir = path.join(repoRoot, 'artifacts', runId);
+    const briefPath = makeBrief(artifactsDir);
+
+    assert.throws(
+      () => run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath })),
+      (error) => error instanceof PreflightError && /inside the source checkout/.test(error.message),
+    );
+  });
+
+  test('refuses an existing --worktree path that is not a git worktree of this repo', () => {
+    const repoRoot = makeRepo();
+    const runId = nextRunId();
+    const worktree = tempDir('tfa-plain-dir-'); // exists, but never `git worktree add`-ed
+    const artifactsDir = path.join(repoRoot, 'artifacts', runId);
+    const briefPath = makeBrief(artifactsDir);
+
+    assert.throws(
+      () => run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath })),
+      (error) => error instanceof PreflightError && /is not a git worktree of/.test(error.message),
+    );
+  });
+
+  test('refuses an existing worktree whose checked-out branch does not match --branch', () => {
+    const repoRoot = makeRepo();
+    const runId = nextRunId();
+    const worktree = path.join(os.tmpdir(), `tfa-wt-${runId}`);
+    tempRoots.push(worktree);
+    git(['worktree', 'add', '-b', `other-branch-${runId}`, worktree, 'HEAD'], repoRoot);
+    const artifactsDir = path.join(repoRoot, 'artifacts', runId);
+    const briefPath = makeBrief(artifactsDir);
+
+    assert.throws(
+      () => run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath })),
+      (error) => error instanceof PreflightError && /but --branch says/.test(error.message),
+    );
+  });
+
+  test('refuses an existing worktree with uncommitted changes from an earlier run', () => {
+    const repoRoot = makeRepo();
+    const runId = nextRunId();
+    const branch = `agent/${runId}`;
+    const worktree = path.join(os.tmpdir(), `tfa-wt-${runId}`);
+    tempRoots.push(worktree);
+    git(['worktree', 'add', '-b', branch, worktree, 'HEAD'], repoRoot);
+    fs.writeFileSync(path.join(worktree, 'uncommitted.txt'), 'oops\n');
+    const artifactsDir = path.join(repoRoot, 'artifacts', runId);
+    const briefPath = makeBrief(artifactsDir);
+
+    assert.throws(
+      () => run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath, branch })),
+      (error) => error instanceof PreflightError && /uncommitted changes/.test(error.message),
+    );
   });
 });
 
