@@ -10,6 +10,7 @@ import {
   decide,
   deniedRelPath,
   disallowedToolsFor,
+  JIRA_READ_TOOL_NAMES,
   targetPathsFor,
 } from '../src/policy.js';
 
@@ -43,6 +44,21 @@ describe('tool sets', () => {
     assert.ok(!allowedToolsFor('execute').includes('PowerShell'));
     for (const tool of ['WebFetch', 'WebSearch', 'Task', 'NotebookEdit']) {
       assert.ok(disallowedToolsFor('execute').includes(tool));
+    }
+  });
+
+  test('intake mode is read-only, plus exactly the qualified Jira read tools', () => {
+    const allowed = allowedToolsFor('intake');
+    assert.ok(allowed.includes('Read'));
+    assert.ok(allowed.includes('Glob'));
+    assert.ok(allowed.includes('Grep'));
+    assert.ok(allowed.includes('TodoWrite'));
+    for (const tool of ['Edit', 'Write', 'Bash', 'PowerShell']) {
+      assert.ok(!allowed.includes(tool), `${tool} must not be allowed in intake mode`);
+      assert.ok(disallowedToolsFor('intake').includes(tool), `${tool} should be stripped in intake mode`);
+    }
+    for (const name of JIRA_READ_TOOL_NAMES) {
+      assert.ok(allowed.includes(`mcp__jira__${name}`), `mcp__jira__${name} should be allowed in intake mode`);
     }
   });
 });
@@ -222,17 +238,19 @@ describe('targetPathsFor', () => {
 });
 
 describe('decide — the gate as a whole', () => {
-  test('plan mode refuses to write, edit, or run anything', () => {
+  test('plan and intake modes refuse to write, edit, or run anything', () => {
     const jail = makeWorktree();
-    for (const [tool, input] of [
-      ['Write', { file_path: 'src/New.cs', content: 'x' }],
-      ['Edit', { file_path: 'src/TaskFlow.Api/Program.cs' }],
-      ['Bash', { command: 'dotnet build' }],
-      ['PowerShell', { command: 'dotnet build' }],
-    ] as const) {
-      const decision = decide({ mode: 'plan', worktree: jail }, tool, input);
-      assert.equal(decision.allow, false, `${tool} must be denied in plan mode`);
-      assert.match(decision.reason, /not available in plan mode/);
+    for (const mode of ['plan', 'intake'] as const) {
+      for (const [tool, input] of [
+        ['Write', { file_path: 'src/New.cs', content: 'x' }],
+        ['Edit', { file_path: 'src/TaskFlow.Api/Program.cs' }],
+        ['Bash', { command: 'dotnet build' }],
+        ['PowerShell', { command: 'dotnet build' }],
+      ] as const) {
+        const decision = decide({ mode, worktree: jail }, tool, input);
+        assert.equal(decision.allow, false, `${tool} must be denied in ${mode} mode`);
+        assert.match(decision.reason, new RegExp(`not available in ${mode} mode`));
+      }
     }
   });
 
@@ -299,10 +317,57 @@ describe('decide — the gate as a whole', () => {
     assert.match(decision.reason, /plan\.proposed\.md/);
   });
 
+  test('ExitPlanMode under intake is denied with a reason that says where the brief goes', () => {
+    const jail = makeWorktree();
+    const decision = decide({ mode: 'intake', worktree: jail }, 'ExitPlanMode', {});
+    assert.equal(decision.allow, false);
+    assert.match(decision.reason, /final message/);
+    assert.match(decision.reason, /ticket-brief\.proposed\.md/);
+  });
+
   test('TodoWrite is allowed — it touches neither filesystem nor shell', () => {
     const jail = makeWorktree();
     for (const mode of ['plan', 'execute'] as const) {
       assert.ok(decide({ mode, worktree: jail }, 'TodoWrite', { todos: [] }).allow);
     }
+  });
+
+  describe('Jira tools (intake only)', () => {
+    test('every permitted Jira read tool is allowed under intake', () => {
+      const jail = makeWorktree();
+      for (const name of JIRA_READ_TOOL_NAMES) {
+        const decision = decide({ mode: 'intake', worktree: jail }, `mcp__jira__${name}`, {});
+        assert.ok(decision.allow, `mcp__jira__${name} should be allowed: ${decision.reason}`);
+      }
+    });
+
+    test('a Jira tool outside the allow-list is denied under intake', () => {
+      const jail = makeWorktree();
+      for (const tool of [
+        'mcp__jira__transitionJiraIssue',
+        'mcp__jira__addCommentToJiraIssue',
+        'mcp__jira__editJiraIssue',
+        'mcp__jira__deleteJiraIssue',
+        'mcp__jira__fetch',
+        'mcp__jira__search',
+        // The ambient project plugin's namespace, not just this runner's own 'jira' server --
+        // proves no tool from any other MCP server is reachable either, not just unlisted Jira ones.
+        'mcp__atlassian__getConfluencePage',
+        'mcp__atlassian__getJiraIssue',
+      ]) {
+        const decision = decide({ mode: 'intake', worktree: jail }, tool, {});
+        assert.equal(decision.allow, false, `${tool} must be denied`);
+      }
+    });
+
+    test('every Jira read tool is still denied under plan and execute', () => {
+      const jail = makeWorktree();
+      for (const mode of ['plan', 'execute'] as const) {
+        for (const name of JIRA_READ_TOOL_NAMES) {
+          const decision = decide({ mode, worktree: jail }, `mcp__jira__${name}`, {});
+          assert.equal(decision.allow, false, `mcp__jira__${name} must be denied in ${mode} mode`);
+        }
+      }
+    });
   });
 });

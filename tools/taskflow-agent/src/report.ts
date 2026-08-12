@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { APPROVED_FILENAME, PROPOSAL_FILENAME } from './approval.js';
+import { filenamesFor } from './approval.js';
 import type { ExitCodeValue } from './exit.js';
 import { ExitCode } from './exit.js';
 import { commitsOnBranch, worktreeDiffStat } from './preflight.js';
@@ -14,7 +14,7 @@ export interface ReportInputs {
   verify: VerifyResult | null;
   exitCode: ExitCodeValue;
   journalPath: string;
-  planWritten: string | null;
+  proposalWritten: string | null;
 }
 
 function fenced(body: string): string {
@@ -41,7 +41,7 @@ function subtypeExplanation(outcome: RunOutcome): string {
 }
 
 export function buildReport(inputs: ReportInputs): string {
-  const { ctx, outcome, verify, exitCode, journalPath, planWritten } = inputs;
+  const { ctx, outcome, verify, exitCode, journalPath, proposalWritten } = inputs;
   const { args, meta } = ctx;
   const lines: string[] = [];
 
@@ -56,8 +56,12 @@ export function buildReport(inputs: ReportInputs): string {
   lines.push(`| branch | \`${args.branch}\` |`);
   lines.push(`| base commit | \`${meta.baseCommit.slice(0, 12)}\` |`);
   lines.push(`| source checkout | \`${ctx.repoRoot}\` at \`${ctx.sourceHead.slice(0, 12)}\` |`);
-  lines.push(`| input | \`${args.inputPath}\` |`);
-  lines.push(`| input sha256 | \`${ctx.inputSha}\` |`);
+  if (args.mode === 'intake') {
+    lines.push(`| ticket | \`${args.ticketKey}\` |`);
+  } else {
+    lines.push(`| input | \`${args.inputPath}\` |`);
+    lines.push(`| input sha256 | \`${ctx.inputSha}\` |`);
+  }
   if (ctx.approval !== null) {
     lines.push(`| approved by | ${ctx.approval.approver} on ${ctx.approval.date} |`);
   }
@@ -108,35 +112,38 @@ export function buildReport(inputs: ReportInputs): string {
   }
   lines.push('');
 
-  if (args.mode === 'plan') {
+  if (args.mode === 'intake' || args.mode === 'plan') {
+    const deliverable = args.mode === 'intake' ? 'ticket brief' : 'plan';
+    const filenames = filenamesFor(args.mode);
+    const nextCommand =
+      args.mode === 'intake'
+        ? `taskflow-agent plan --brief artifacts/${args.runId}/${filenames.approved} --worktree ${args.worktree}`
+        : `taskflow-agent execute --approved-plan artifacts/${args.runId}/${filenames.approved} --worktree ${args.worktree}`;
+
     lines.push('## Verification', '');
-    lines.push('Not applicable: a plan run changes nothing, so there is no build or test to run.');
+    lines.push(`Not applicable: a ${args.mode} run changes nothing, so there is no build or test to run.`);
     lines.push('');
-    lines.push('## Proposal', '');
-    if (planWritten === null) {
+    lines.push(`## ${args.mode === 'intake' ? 'Ticket brief' : 'Proposal'}`, '');
+    if (proposalWritten === null) {
       lines.push(
-        'No plan was written: the run did not finish successfully. The agent output is in the journal ' +
-          'under `assistant.turn`.',
+        `No ${deliverable} was written: the run did not finish successfully. The agent output is in ` +
+          'the journal under `assistant.turn`.',
       );
     } else {
-      lines.push(`Proposal written to \`${planWritten}\`.`, '');
-      lines.push('This is a **proposal, not an approved plan**. To approve it:', '');
+      lines.push(`${deliverable === 'plan' ? 'Proposal' : 'Brief'} written to \`${proposalWritten}\`.`, '');
+      lines.push(`This is a **proposal, not an approved ${deliverable}**. To approve it:`, '');
       lines.push(
         fenced(
           [
-            `cd ${path.dirname(planWritten)}`,
-            `cp ${PROPOSAL_FILENAME} ${APPROVED_FILENAME}`,
+            `cd ${path.dirname(proposalWritten)}`,
+            `cp ${filenames.proposed} ${filenames.approved}`,
             `# read it, edit it, then add this as the first line:`,
             `# <!-- approved-by: Your Name ${new Date().toISOString().slice(0, 10)} base: ${meta.baseCommit.slice(0, 12)} -->`,
           ].join('\n'),
         ),
       );
       lines.push('', 'Then run:', '');
-      lines.push(
-        fenced(
-          `taskflow-agent execute --approved-plan artifacts/${args.runId}/${APPROVED_FILENAME} --worktree ${args.worktree}`,
-        ),
-      );
+      lines.push(fenced(nextCommand));
     }
     lines.push('');
   } else {
@@ -168,6 +175,17 @@ export function buildReport(inputs: ReportInputs): string {
     lines.push('', 'Review it with:', '');
     lines.push(fenced(`git -C "${args.worktree}" diff`));
     lines.push('');
+
+    lines.push('## Acceptance criteria', '');
+    if (outcome.finalText === null) {
+      lines.push(
+        'Not available: the run ended without a final message. See `assistant.turn` in the journal ' +
+          'for whatever the agent did produce.',
+      );
+    } else {
+      lines.push(outcome.finalText.trim());
+    }
+    lines.push('');
   }
 
   return `${lines.join('\n')}\n`;
@@ -193,8 +211,8 @@ export function printSummary(inputs: ReportInputs, reportPath: string): void {
   if (ctx.args.mode === 'execute' && verify !== null) {
     out.push(`  verify     ${verify.ran ? (verify.passed ? 'build and tests passed' : 'build or tests failed') : 'did not run'}`);
   }
-  if (inputs.planWritten !== null) {
-    out.push(`  proposal   ${inputs.planWritten}`);
+  if (inputs.proposalWritten !== null) {
+    out.push(`  proposal   ${inputs.proposalWritten}`);
   }
   out.push(`  worktree   ${ctx.args.worktree}`);
   out.push(`  report     ${reportPath}`);

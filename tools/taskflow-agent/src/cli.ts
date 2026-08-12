@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { PROPOSAL_FILENAME } from './approval.js';
+import { filenamesFor } from './approval.js';
 import { parseCliArgs } from './args.js';
 import type { ExitCodeValue } from './exit.js';
 import { ExitCode, exitCodeOf, RunnerError } from './exit.js';
 import { resolveRepoRoot } from './git.js';
+import { redactJiraSecrets } from './jira.js';
 import { Journal } from './journal.js';
 import { runPreflight } from './preflight.js';
 import { printSummary, writeReport } from './report.js';
@@ -49,7 +50,8 @@ async function main(): Promise<ExitCodeValue> {
     model: args.model,
     bounds: { maxTurns: args.maxTurns, maxCostUsd: args.maxCostUsd, timeoutMinutes: args.timeoutMinutes },
     repoRoot,
-    inputPath: args.inputPath,
+    inputPath: args.mode === 'intake' ? null : args.inputPath,
+    ticket: args.ticketKey,
     node: process.version,
   });
 
@@ -57,12 +59,17 @@ async function main(): Promise<ExitCodeValue> {
   try {
     ctx = runPreflight({ args, repoRoot, artifactsDir, journal });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = redactJiraSecrets(error instanceof Error ? error.message : String(error));
     journal.append('run.refused', { reason: message, exitCode: exitCodeOf(error) });
     throw error;
   }
 
-  journal.append('run.input', { path: args.inputPath, sha256: ctx.inputSha, text: ctx.inputText });
+  journal.append(
+    'run.input',
+    args.mode === 'intake'
+      ? { ticket: args.ticketKey }
+      : { path: args.inputPath, sha256: ctx.inputSha, text: ctx.inputText },
+  );
 
   // A throw here must not skip verification and the report: in execute mode the agent may already have changed files, and that partial change is exactly what needs measuring. The full stack goes to the journal, one readable line to the operator.
   const agentStartedAt = Date.now();
@@ -71,19 +78,20 @@ async function main(): Promise<ExitCodeValue> {
   try {
     outcome = await runAgent(ctx, journal);
   } catch (error) {
-    crashMessage = error instanceof Error ? error.message : String(error);
+    crashMessage = redactJiraSecrets(error instanceof Error ? error.message : String(error));
+    const stack = error instanceof Error ? error.stack : undefined;
     journal.append('sdk.result', {
       subtype: 'error_during_execution',
       error: crashMessage,
-      stack: error instanceof Error ? error.stack : undefined,
+      stack: stack === undefined ? undefined : redactJiraSecrets(stack),
     });
     outcome = crashedOutcome(crashMessage, Date.now() - agentStartedAt);
   }
 
-  let planWritten: string | null = null;
-  if (args.mode === 'plan' && outcome.finalText !== null && outcome.finalText.trim() !== '') {
-    planWritten = path.join(artifactsDir, PROPOSAL_FILENAME);
-    fs.writeFileSync(planWritten, `${outcome.finalText.trim()}\n`, 'utf8');
+  let proposalWritten: string | null = null;
+  if (args.mode !== 'execute' && outcome.finalText !== null && outcome.finalText.trim() !== '') {
+    proposalWritten = path.join(artifactsDir, filenamesFor(args.mode).proposed);
+    fs.writeFileSync(proposalWritten, `${outcome.finalText.trim()}\n`, 'utf8');
   }
 
   let verify: VerifyResult | null = null;
@@ -97,11 +105,11 @@ async function main(): Promise<ExitCodeValue> {
   if (exitCode === ExitCode.Success && verify !== null && !verify.passed) {
     exitCode = ExitCode.VerificationFailed;
   }
-  if (args.mode === 'plan' && exitCode === ExitCode.Success && planWritten === null) {
+  if (args.mode !== 'execute' && exitCode === ExitCode.Success && proposalWritten === null) {
     exitCode = ExitCode.SdkError;
   }
 
-  const reportInputs = { ctx, outcome, verify, exitCode, journalPath: journal.path, planWritten };
+  const reportInputs = { ctx, outcome, verify, exitCode, journalPath: journal.path, proposalWritten };
   const reportPath = writeReport(reportInputs);
   printSummary(reportInputs, reportPath);
   journal.append('run.end', { exitCode, report: reportPath, wallClockMs: outcome.wallClockMs });
@@ -117,10 +125,10 @@ main().then(
     process.exitCode = code;
   },
   (error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = redactJiraSecrets(error instanceof Error ? error.message : String(error));
     process.stderr.write(`taskflow-agent: ${message}\n`);
     if (!(error instanceof RunnerError) && error instanceof Error && error.stack !== undefined) {
-      process.stderr.write(`${error.stack}\n`);
+      process.stderr.write(`${redactJiraSecrets(error.stack)}\n`);
     }
     process.exitCode = exitCodeOf(error);
   },

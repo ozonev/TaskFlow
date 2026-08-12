@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Approval } from './approval.js';
-import { APPROVED_FILENAME, PROPOSAL_FILENAME, verifyApproval } from './approval.js';
+import { filenamesFor, verifyApproval } from './approval.js';
 import type { Mode, ParsedArgs } from './args.js';
 import { PreflightError } from './exit.js';
 import {
@@ -15,6 +15,7 @@ import {
   listWorktrees,
 } from './git.js';
 import { sha256 } from './hash.js';
+import type { JiraCredentials } from './jira.js';
 import type { Journal } from './journal.js';
 import { isInsideDir, samePath } from './paths.js';
 
@@ -40,6 +41,7 @@ export interface RunContext {
   inputText: string;
   inputSha: string;
   approval: Approval | null;
+  jiraCredentials: JiraCredentials | null;
 }
 
 // 'develop' and 'trunk' are the other two common default/integration-branch names alongside main/master; used only when origin/HEAD couldn't be read, so the fallback errs on the side of refusing a plausible default branch.
@@ -56,19 +58,34 @@ function readTextFile(file: string, label: string): string {
   return text;
 }
 
-function readMeta(artifactsDir: string, runId: string): RunMeta {
-  const file = path.join(artifactsDir, 'meta.json');
-  if (!fs.existsSync(file)) {
-    throw new PreflightError(
-      `no run metadata at ${file}, so there is nothing approved to execute.\n` +
-        `  Run 'taskflow-agent plan' for run id '${runId}' first.`,
-    );
-  }
+function readMetaFile(file: string): RunMeta {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf8')) as RunMeta;
   } catch (error) {
     throw new PreflightError(`${file} is not readable JSON: ${error instanceof Error ? error.message : error}`);
   }
+}
+
+function readMeta(artifactsDir: string, runId: string): RunMeta {
+  const file = path.join(artifactsDir, 'meta.json');
+  if (!fs.existsSync(file)) {
+    throw new PreflightError(
+      `no run metadata at ${file}, so there is nothing approved to execute.\n` +
+        `  Run 'taskflow-agent intake' or 'taskflow-agent plan' for run id '${runId}' first.`,
+    );
+  }
+  return readMetaFile(file);
+}
+
+// Unlike readMeta, absence is not an error here -- intake and plan (unlike execute) can each be the
+// very first phase run for a run-id, in which case there is nothing yet to read.
+function readMetaIfExists(artifactsDir: string): RunMeta | null {
+  const file = path.join(artifactsDir, 'meta.json');
+  return fs.existsSync(file) ? readMetaFile(file) : null;
+}
+
+function readIfExists(file: string): string | null {
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 }
 
 function writeMeta(artifactsDir: string, meta: RunMeta): void {
@@ -83,6 +100,27 @@ function checkApiKey(): void {
         '  so an API key is required: $env:ANTHROPIC_API_KEY = "sk-..."',
     );
   }
+}
+
+// Checked only for intake, before any network call, and never journalled.
+function checkJiraCredentials(): JiraCredentials {
+  const email = process.env['JIRA_EMAIL'];
+  const apiToken = process.env['JIRA_API_TOKEN'];
+  const missing = [
+    email === undefined || email.trim() === '' ? 'JIRA_EMAIL' : null,
+    apiToken === undefined || apiToken.trim() === '' ? 'JIRA_API_TOKEN' : null,
+  ].filter((name): name is string => name !== null);
+
+  if (missing.length > 0) {
+    throw new PreflightError(
+      `${missing.join(' and ')} ${missing.length > 1 ? 'are' : 'is'} not set. intake needs a personal Atlassian\n` +
+        `  API token to read Jira read-only:\n` +
+        `    $env:JIRA_EMAIL = "you@example.com"\n` +
+        `    $env:JIRA_API_TOKEN = "..."\n` +
+        `  Create one at https://id.atlassian.com/manage-profile/security/api-tokens`,
+    );
+  }
+  return { email: email!.trim(), apiToken: apiToken!.trim() };
 }
 
 function checkProtectedBranch(branch: string, repoRoot: string): { branch: string | null; detected: boolean } {
@@ -166,32 +204,58 @@ export interface PreflightInputs {
   journal: Journal;
 }
 
-// Every refusal path throws PreflightError, so the caller maps them all to exit 2 uniformly. Order matters: the approval check for `execute` runs before the API key check so an unapproved plan is rejected without needing credentials.
+// Every refusal path throws PreflightError, so the caller maps them all to exit 2 uniformly. Order matters: the approval check for `execute`/`plan` runs before any credential check so an unapproved plan or brief is rejected without needing credentials.
 export function runPreflight(inputs: PreflightInputs): RunContext {
   const { args, repoRoot, artifactsDir, journal } = inputs;
 
-  const inputText = readTextFile(args.inputPath, args.inputFlag === '--brief' ? 'the brief' : 'the approved plan');
-  const inputSha = sha256(inputText);
+  let inputText = '';
+  let inputSha = '';
+  let jiraCredentials: JiraCredentials | null = null;
+
+  if (args.mode === 'intake') {
+    jiraCredentials = checkJiraCredentials();
+  } else {
+    inputText = readTextFile(args.inputPath, args.inputFlag === '--brief' ? 'the brief' : 'the approved plan');
+    inputSha = sha256(inputText);
+  }
 
   let approval: Approval | null = null;
-  let approvedMeta: RunMeta | null = null;
   let worktreeCreated = false;
 
+  // execute always has a prior meta.json (intake or plan ran first); intake and plan may each be the
+  // first phase for a run-id, in which case there is nothing yet to read.
+  const existingMeta = args.mode === 'execute' ? readMeta(artifactsDir, args.runId) : readMetaIfExists(artifactsDir);
+
   if (args.mode === 'execute') {
-    approvedMeta = readMeta(artifactsDir, args.runId);
-    const proposalPath = path.join(artifactsDir, PROPOSAL_FILENAME);
+    const filenames = filenamesFor('plan');
     approval = verifyApproval({
       approvedPath: args.inputPath,
       approvedText: inputText,
-      proposedText: fs.existsSync(proposalPath) ? fs.readFileSync(proposalPath, 'utf8') : null,
-      baseCommit: approvedMeta.baseCommit,
+      proposedText: readIfExists(path.join(artifactsDir, filenames.proposed)),
+      baseCommit: existingMeta!.baseCommit,
+      filenames,
     });
+  } else if (args.mode === 'plan' && existingMeta !== null && existingMeta.createdBy === 'intake') {
+    // The brief for this run-id came from intake, so it must carry the same approval as an
+    // approved plan does for execute -- otherwise live, mutable ticket text (rather than a reviewed
+    // brief) would be what drives implementation.
+    const filenames = filenamesFor('intake');
+    approval = verifyApproval({
+      approvedPath: args.inputPath,
+      approvedText: inputText,
+      proposedText: readIfExists(path.join(artifactsDir, filenames.proposed)),
+      baseCommit: existingMeta.baseCommit,
+      filenames,
+    });
+  }
+
+  if (approval !== null) {
     journal.append('approval.accepted', {
       approver: approval.approver,
       date: approval.date,
       base: approval.base,
-      approvedPlan: args.inputPath,
-      approvedPlanSha256: inputSha,
+      approvedFile: args.inputPath,
+      approvedFileSha256: inputSha,
     });
   }
 
@@ -237,7 +301,8 @@ export function runPreflight(inputs: PreflightInputs): RunContext {
   });
 
   let meta: RunMeta;
-  if (approvedMeta === null) {
+  if (existingMeta === null) {
+    // Only reachable for intake/plan: execute's existingMeta is never null (readMeta throws first).
     meta = {
       runId: args.runId,
       worktree: args.worktree,
@@ -245,19 +310,19 @@ export function runPreflight(inputs: PreflightInputs): RunContext {
       baseCommit: worktreeHead,
       repoRoot,
       createdAt: new Date().toISOString(),
-      createdBy: 'plan',
+      createdBy: args.mode,
     };
     writeMeta(artifactsDir, meta);
   } else {
     // Nothing in this tool commits, so a worktree HEAD that has moved off the recorded base means someone committed by hand -- the approval no longer describes the tree it would be applied to.
-    if (worktreeHead !== approvedMeta.baseCommit) {
+    if (worktreeHead !== existingMeta.baseCommit) {
       throw new PreflightError(
-        `${args.worktree} is no longer at the commit the plan was approved against.\n` +
-          `  approved base: ${approvedMeta.baseCommit.slice(0, 12)}\n` +
+        `${args.worktree} is no longer at the commit this run-id was approved against.\n` +
+          `  recorded base: ${existingMeta.baseCommit.slice(0, 12)}\n` +
           `  worktree HEAD: ${worktreeHead.slice(0, 12)}`,
       );
     }
-    meta = approvedMeta;
+    meta = existingMeta;
   }
 
   return {
@@ -272,6 +337,7 @@ export function runPreflight(inputs: PreflightInputs): RunContext {
     inputText,
     inputSha,
     approval,
+    jiraCredentials,
   };
 }
 

@@ -1,24 +1,50 @@
 import path from 'node:path';
 import type { Mode } from './args.js';
+import { filenamesFor } from './approval.js';
 import { isInsideDir, realpathNearest, samePath, toPosix } from './paths.js';
 
 // TodoWrite touches neither the filesystem nor a shell, so denying it only produced misleading "denied" noise in the audit trail.
 const READ_TOOLS = ['Read', 'Glob', 'Grep', 'TodoWrite'];
 
+// The MCP server key intake registers its Jira connection under (see jira.ts); the SDK qualifies
+// tool names as mcp__<serverName>__<toolName>, so this must match buildJiraMcpServerConfig's key.
+export const JIRA_MCP_SERVER_NAME = 'jira';
+
+// Every Jira tool intake is ever allowed to call. Read-only by construction: no create/edit/
+// transition/comment/link/worklog tool appears here, and none for Confluence or Compass either.
+// Observed via an interactive session's plugin catalog, not a versioned contract -- reverify
+// against the live server if Atlassian's MCP tool set changes (see README "Limits worth knowing").
+export const JIRA_READ_TOOL_NAMES = [
+  'getAccessibleAtlassianResources',
+  'getJiraIssue',
+  'searchJiraIssuesUsingJql',
+  'getJiraIssueRemoteIssueLinks',
+  'getTransitionsForJiraIssue',
+  'getJiraProjectIssueTypesMetadata',
+  'getJiraIssueTypeMetaWithFields',
+  'getVisibleJiraProjects',
+  'lookupJiraAccountId',
+  'getIssueLinkTypes',
+];
+
+const JIRA_QUALIFIED_TOOLS = JIRA_READ_TOOL_NAMES.map((name) => `mcp__${JIRA_MCP_SERVER_NAME}__${name}`);
+
 export const PLAN_TOOLS = [...READ_TOOLS];
+export const INTAKE_TOOLS = [...READ_TOOLS, ...JIRA_QUALIFIED_TOOLS];
 export const EXECUTE_TOOLS = [...READ_TOOLS, 'Edit', 'Write', 'Bash'];
 
 const NEVER_ALLOWED = ['WebFetch', 'WebSearch', 'Task', 'NotebookEdit'];
 
 export function allowedToolsFor(mode: Mode): string[] {
+  if (mode === 'intake') return [...INTAKE_TOOLS];
   return mode === 'plan' ? [...PLAN_TOOLS] : [...EXECUTE_TOOLS];
 }
 
 // Belt-and-braces only: the gate below is what actually enforces the boundary, since disallowedTools and allowedTools are both permission-layer settings that project or local config could in principle widen.
 export function disallowedToolsFor(mode: Mode): string[] {
-  return mode === 'plan'
-    ? [...NEVER_ALLOWED, 'Edit', 'Write', 'Bash', 'PowerShell']
-    : [...NEVER_ALLOWED, 'PowerShell'];
+  return mode === 'execute'
+    ? [...NEVER_ALLOWED, 'PowerShell']
+    : [...NEVER_ALLOWED, 'Edit', 'Write', 'Bash', 'PowerShell'];
 }
 
 /** Whole-command patterns. A prefix match would be worthless — see classifyCommand. */
@@ -158,9 +184,11 @@ export function decide(options: GateOptions, tool: string, input: unknown): Deci
   if (!allowed.includes(tool)) {
     // The claude_code preset's plan-mode footer tells the model to deliver its plan by calling ExitPlanMode. It stays denied -- approving it could transition the session out of plan mode -- so the reason has to tell the model where the plan actually goes, or it burns turns retrying.
     if (tool === 'ExitPlanMode') {
+      const deliverable = options.mode === 'intake' ? 'brief' : 'plan';
+      const proposalFile = options.mode === 'execute' ? 'plan.proposed.md' : filenamesFor(options.mode).proposed;
       return deny(
-        'ExitPlanMode is not used here. Put the complete plan in your final message instead; ' +
-          'the host writes that message verbatim to plan.proposed.md and a human reviews it afterwards.',
+        `ExitPlanMode is not used here. Put the complete ${deliverable} in your final message instead; ` +
+          `the host writes that message verbatim to ${proposalFile} and a human reviews it afterwards.`,
       );
     }
     return deny(`${tool} is not available in ${options.mode} mode (allowed: ${allowed.join(', ')})`);

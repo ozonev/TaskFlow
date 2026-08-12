@@ -16,6 +16,10 @@ function planArgs(extra: string[] = []): string[] {
   return ['plan', '--brief', 'brief.md', '--worktree', '../wt/run-1', ...extra];
 }
 
+function intakeArgs(extra: string[] = []): string[] {
+  return ['intake', '--ticket', 'TASK-123', '--worktree', '../wt/run-1', ...extra];
+}
+
 describe('subcommands', () => {
   test('no arguments prints help rather than failing', () => {
     assert.equal(parseCliArgs([], CWD).kind, 'help');
@@ -51,14 +55,48 @@ describe('required flags', () => {
     assert.throws(() => parseCliArgs(['execute', '--worktree', 'x'], CWD), UsageError);
   });
 
-  test('each mode rejects the other mode input flag', () => {
+  test('intake needs --ticket and --worktree', () => {
+    assert.throws(() => parseCliArgs(['intake', '--worktree', 'x'], CWD), UsageError);
+    assert.throws(() => parseCliArgs(['intake', '--ticket', 'TASK-123'], CWD), UsageError);
+  });
+
+  test('each mode rejects the other modes\' input flags', () => {
     assert.throws(() => parseCliArgs(['plan', '--approved-plan', 'p.md', '--worktree', 'x'], CWD), UsageError);
+    assert.throws(() => parseCliArgs(['plan', '--ticket', 'TASK-1', '--worktree', 'x'], CWD), UsageError);
     assert.throws(() => parseCliArgs(['execute', '--brief', 'b.md', '--worktree', 'x'], CWD), UsageError);
+    assert.throws(() => parseCliArgs(['execute', '--ticket', 'TASK-1', '--worktree', 'x'], CWD), UsageError);
+    assert.throws(() => parseCliArgs(['intake', '--brief', 'b.md', '--worktree', 'x'], CWD), UsageError);
+    assert.throws(() => parseCliArgs(['intake', '--approved-plan', 'p.md', '--worktree', 'x'], CWD), UsageError);
   });
 
   test('an empty flag value is rejected', () => {
     assert.throws(() => parseCliArgs(['plan', '--brief', '  ', '--worktree', 'x'], CWD), UsageError);
   });
+});
+
+describe('--ticket validation', () => {
+  for (const good of ['TASK-123', 'AB1-45', 'X2-7', 'PROJ-1']) {
+    test(`'${good}' is accepted`, () => {
+      const args = parse(intakeArgs(['--ticket', good]));
+      assert.equal(args.ticketKey, good);
+    });
+  }
+
+  for (const bad of [
+    'task-123',
+    'TASK123',
+    'TASK-0x1',
+    '-123',
+    'TASK--123',
+    'TASK-123 extra',
+    'TASK-123\nrm -rf /',
+    '',
+    '   ',
+  ]) {
+    test(`'${bad}' is rejected`, () => {
+      assert.throws(() => parseCliArgs(intakeArgs(['--ticket', bad]), CWD), UsageError);
+    });
+  }
 });
 
 describe('defaults', () => {
@@ -74,6 +112,13 @@ describe('defaults', () => {
     const args = parse(['execute', '--approved-plan', 'p.md', '--worktree', '../wt/run-1']);
     assert.equal(args.maxTurns, 40);
     assert.equal(args.maxCostUsd, 10);
+  });
+
+  test('intake defaults to 10 turns and $1', () => {
+    const args = parse(intakeArgs());
+    assert.equal(args.maxTurns, 10);
+    assert.equal(args.maxCostUsd, 1);
+    assert.equal(args.ticketKey, 'TASK-123');
   });
 
   test('run id defaults to the worktree basename, branch to agent/<run-id>', () => {
@@ -145,5 +190,12 @@ describe('help text honesty', () => {
     for (const pattern of [/--yes\b/, /--auto-approve\b/, /--approve\b/, /--force\b/, /--skip\b/]) {
       assert.doesNotMatch(HELP_TEXT, pattern);
     }
+  });
+
+  test('no credential can be passed as a flag', () => {
+    assert.ok(
+      !OPTION_NAMES.some((name) => /token/i.test(name)),
+      'a --*token* flag would let a credential be passed on the command line instead of via environment',
+    );
   });
 });
