@@ -17,11 +17,13 @@ npm link          # optional: puts `taskflow-agent` on PATH
 ```
 
 Without `npm link`, invoke it as `node tools/taskflow-agent/dist/src/cli.js <subcommand> ...` from the
-repo root. Requires Node 20+ (developed on 22.14) and `ANTHROPIC_API_KEY`; the SDK cannot reuse a
-Claude Code subscription login.
+repo root. Requires Node 20+ (developed on 22.14) and either `ANTHROPIC_API_KEY` or
+`CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`, the same token `.github/workflows/claude.yml`
+uses for `claude-code-action`); the SDK cannot reuse an interactive Claude Code subscription login by
+itself.
 
 ```
-npm test          # 212 tests, no network, no Docker, no API key needed
+npm test          # 214 tests, no network, no Docker, no API key needed
 npm run typecheck
 ```
 
@@ -165,7 +167,8 @@ where the "untrusted data" framing applies.
 1. **Args** — unknown flags are errors, not ignored; numeric bounds must be positive.
 2. **Approval** (`execute`, and `plan` when its `--brief` came from `intake`) — before any credential
    check or network call, so an unapproved plan or brief costs nothing.
-3. **`ANTHROPIC_API_KEY`** present, and (`intake` only) `JIRA_EMAIL`/`JIRA_API_TOKEN` present.
+3. **`ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`** present, and (`intake` only)
+   `JIRA_EMAIL`/`JIRA_API_TOKEN` present.
 4. **Clean source checkout** — a dirty tree means the worktree's base commit does not describe what
    you reviewed. The runner's own `artifacts/` output is excluded from this check.
 5. **Protected branch** — the default branch from `origin/HEAD` (currently `Module12`) cannot be a

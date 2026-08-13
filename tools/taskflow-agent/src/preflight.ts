@@ -93,11 +93,17 @@ function writeMeta(artifactsDir: string, meta: RunMeta): void {
 }
 
 function checkApiKey(): void {
-  const key = process.env['ANTHROPIC_API_KEY'];
-  if (key === undefined || key.trim() === '') {
+  const apiKey = process.env['ANTHROPIC_API_KEY'];
+  const oauthToken = process.env['CLAUDE_CODE_OAUTH_TOKEN'];
+  const hasApiKey = apiKey !== undefined && apiKey.trim() !== '';
+  const hasOauthToken = oauthToken !== undefined && oauthToken.trim() !== '';
+
+  if (!hasApiKey && !hasOauthToken) {
     throw new PreflightError(
-      'ANTHROPIC_API_KEY is not set. The Agent SDK cannot reuse a Claude Code subscription login,\n' +
-        '  so an API key is required: $env:ANTHROPIC_API_KEY = "sk-..."',
+      'Neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is set. The Agent SDK cannot reuse an\n' +
+        '  interactive Claude Code subscription login by itself, so one of the two is required:\n' +
+        '    $env:ANTHROPIC_API_KEY = "sk-..."\n' +
+        '    $env:CLAUDE_CODE_OAUTH_TOKEN = "..."   (from `claude setup-token`, same token .github/workflows/claude.yml uses)',
     );
   }
 }
