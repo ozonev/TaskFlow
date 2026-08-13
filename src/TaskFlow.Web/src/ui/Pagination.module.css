@@ -1,0 +1,10 @@
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.position {
+  color: var(--ink-meta);
+}

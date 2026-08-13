@@ -1,0 +1,119 @@
+/* Global reset and primitives. Values come from tokens.css / layout.css only. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote,
+dl,
+dd {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* §8 line 158 — focus is visible everywhere and never removed. The ring itself
+   comes from tokens.css `:focus-visible`; this exists so a component author who
+   reaches for `outline: none` gets it back. Any element opting out of the default
+   ring must draw its own visible indicator (see .focus-inset). */
+:focus-visible {
+  outline-color: var(--interactive-ring);
+}
+
+/* §10 "Task row — Focus: ring inset". An outer ring on a table row is clipped by
+   the table edge, so rows invert the offset instead of dropping it. */
+.focus-inset:focus-visible {
+  outline-offset: calc(-1 * var(--focus-ring-offset));
+}
+
+/* §8 line 159 — text alternatives for status carried visually. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* §8 line 161 — a skip link precedes the header and targets the main region. */
+.skip-link {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  z-index: 100;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  color: var(--ink-body);
+  border: var(--hairline-width) solid var(--attention-rule);
+  border-radius: var(--radius-md);
+  transform: translateY(calc(-100% - var(--space-4)));
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* §5 line 106 — content column maxes at 1200px, flush left with whitespace to
+   the right. Deliberately not `margin: auto`: §5 forbids centred measures. */
+.content-column {
+  max-width: var(--content-max);
+  padding-inline: var(--space-6);
+}
+
+@media (max-width: 760px) {
+  /* §5 line 107 — the one breakpoint. */
+  .content-column {
+    padding-inline: var(--space-4);
+  }
+}
+
+/* §5 line 111 — long titles truncate, descriptions clamp to two lines. */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}

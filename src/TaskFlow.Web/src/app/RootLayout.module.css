@@ -1,0 +1,17 @@
+.shell {
+  min-height: 100vh;
+}
+
+.main {
+  padding-block: var(--space-8);
+}
+
+/* Focusing <main> via the skip link must not draw a ring around the whole page;
+   the destination is announced by the heading that follows. */
+.main:focus {
+  outline: none;
+}
+
+.devPanel {
+  padding-bottom: var(--space-8);
+}

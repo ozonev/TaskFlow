@@ -1,0 +1,51 @@
+.table {
+  text-align: left;
+}
+
+.caption {
+  text-align: left;
+  margin-bottom: var(--space-3);
+  color: var(--ink-meta);
+}
+
+.table th {
+  padding-block: var(--space-2);
+  border-bottom: var(--hairline-width) solid var(--hairline-strong);
+  color: var(--ink-muted);
+}
+
+.row td {
+  padding-block: var(--space-3);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+}
+
+.row:hover {
+  background: var(--surface-quiet);
+}
+
+.nameLink {
+  display: block;
+  max-width: 32ch;
+  color: var(--ink-body);
+  text-decoration: none;
+}
+
+.nameLink:hover {
+  text-decoration: underline;
+}
+
+.description {
+  display: block;
+  max-width: 48ch;
+}
+
+.noDescription {
+  color: var(--ink-meta);
+}
+
+/* §5 line 109 — the project table drops the description column below 760px. */
+@media (max-width: 760px) {
+  .descriptionColumn {
+    display: none;
+  }
+}

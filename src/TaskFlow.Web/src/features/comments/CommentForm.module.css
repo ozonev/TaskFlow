@@ -1,0 +1,9 @@
+.form {
+  padding-top: var(--space-3);
+  border-top: var(--hairline-width) solid var(--hairline-strong);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

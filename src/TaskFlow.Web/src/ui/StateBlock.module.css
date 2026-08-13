@@ -1,0 +1,36 @@
+/* §5 line 112 — sections separate by whitespace, not cards. The error variant is
+   an exception ("§10 Danger tint / ink … Error block background and its text"),
+   which is why only .block--error paints a surface. */
+.block {
+  padding-block: var(--space-6);
+  max-width: 60ch;
+}
+
+.block[role='alert'] {
+  background: var(--danger-surface);
+  color: var(--danger-ink);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  max-width: 100%;
+}
+
+.title {
+  margin-bottom: var(--space-2);
+}
+
+.body {
+  color: inherit;
+}
+
+.block:not([role='alert']) .body {
+  color: var(--ink-muted);
+}
+
+.trace {
+  margin-top: var(--space-2);
+  color: inherit;
+}
+
+.action {
+  margin-top: var(--space-4);
+}

@@ -1,0 +1,55 @@
+.row td {
+  padding-block: var(--space-2);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+}
+
+.bar {
+  display: block;
+  height: 0.85em;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-tint) 25%,
+    var(--skeleton-shimmer) 50%,
+    var(--skeleton-tint) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer var(--duration-skeleton) ease-in-out infinite;
+}
+
+.w1 {
+  width: 85%;
+}
+.w2 {
+  width: 60%;
+}
+.w3 {
+  width: 95%;
+}
+.w4 {
+  width: 70%;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* tokens.css forces animation-duration: 0.01ms globally under reduced motion,
+   which makes this shimmer SNAP to a mid-gradient frame rather than go flat.
+   animation-name: none overrides that regardless of the forced duration. */
+.bar[data-motion='static'] {
+  animation-name: none;
+  background: var(--skeleton-tint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation-name: none;
+    background: var(--skeleton-tint);
+  }
+}

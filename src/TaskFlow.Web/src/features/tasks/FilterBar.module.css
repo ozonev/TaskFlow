@@ -1,0 +1,43 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.label {
+  color: var(--ink-muted);
+}
+
+.control {
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: var(--hairline-width) solid var(--hairline-strong);
+  border-radius: var(--radius-md);
+}
+
+.control:hover {
+  border-color: var(--hairline-hover);
+}
+
+.control:focus-visible {
+  border-color: var(--interactive-ring);
+}
+
+/* §5 line 109 — below the one breakpoint, filters collapse behind a button
+   carrying the active-filter count. Full collapse behaviour (increment 7); for
+   now the bar stacks so nothing overflows narrower viewports without a horizontal
+   scrollbar (§5 line 111). */
+@media (max-width: 760px) {
+  .bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -1,0 +1,41 @@
+.headerSkeleton {
+  padding-block: var(--space-2);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.description {
+  color: var(--ink-muted);
+  margin-bottom: var(--space-4);
+}
+
+.tablist {
+  display: flex;
+  gap: var(--space-4);
+  border-bottom: var(--hairline-width) solid var(--hairline-strong);
+  margin-bottom: var(--space-3);
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  padding: var(--space-2) 0;
+  color: var(--ink-muted);
+  cursor: pointer;
+  /* §10 "active tab" indicator, using the same width token as the header nav. */
+  box-shadow: inset 0 calc(-1 * var(--indicator-width)) 0 transparent;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--ink-body);
+  box-shadow: inset 0 calc(-1 * var(--indicator-width)) 0 var(--interactive);
+}
+
+.tab:hover {
+  color: var(--ink-body);
+}

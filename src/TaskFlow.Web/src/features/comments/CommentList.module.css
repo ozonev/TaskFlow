@@ -1,0 +1,36 @@
+.empty {
+  color: var(--ink-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+
+.item {
+  padding-block: var(--space-3);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+}
+
+/* §10 "Comment — pending: 60% opacity while pending". §6 line 123 — under
+   reduced motion this is the ONLY signal (no cross-fade), so it must not depend
+   on a transition to be perceptible — a plain opacity value already isn't one. */
+.item[data-state='pending'] {
+  opacity: var(--opacity-pending);
+}
+
+.author {
+  font-weight: 600;
+}
+
+.timestamp {
+  display: block;
+  color: var(--ink-meta);
+  margin-top: var(--space-1);
+}
+
+.failedNote {
+  color: var(--ink-error);
+  margin-top: var(--space-2);
+}

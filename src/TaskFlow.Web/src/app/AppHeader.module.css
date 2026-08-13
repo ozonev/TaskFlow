@@ -1,0 +1,64 @@
+/* §5 line 112 — sections are separated by whitespace, not rules or cards. The
+   header is the one exception: it needs a boundary against scrolling content. */
+.header {
+  border-bottom: var(--hairline-width) solid var(--hairline);
+  background: var(--color-bg);
+}
+
+.inner {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding-block: var(--space-3);
+}
+
+.brandGroup {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.brand {
+  color: var(--ink-body);
+  text-decoration: none;
+}
+
+.brand:hover {
+  text-decoration: underline;
+}
+
+/* §10 "Planned control" borrows the dashed treatment; this uses it for the same
+   reason — signalling "not the real thing" without relying on colour alone. */
+.badge {
+  padding: var(--space-1) var(--space-2);
+  border: var(--hairline-width) dashed var(--attention-rule);
+  border-radius: var(--radius-md);
+  color: var(--ink-error);
+  white-space: nowrap;
+}
+
+.navLink {
+  color: var(--ink-muted);
+  text-decoration: none;
+  padding-block: var(--space-1);
+}
+
+.navLink:hover {
+  color: var(--ink-body);
+  text-decoration: underline;
+}
+
+.navLinkActive {
+  color: var(--ink-body);
+  box-shadow: inset 0 calc(-1 * var(--indicator-width)) 0 var(--interactive);
+}
+
+@media (max-width: 760px) {
+  /* §5 line 107 — the one breakpoint; see --bp-narrow in layout.css. */
+  .inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+}

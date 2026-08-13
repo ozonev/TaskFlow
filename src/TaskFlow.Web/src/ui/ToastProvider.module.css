@@ -1,0 +1,44 @@
+.stack {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: min(24rem, calc(100vw - var(--space-8)));
+}
+
+.card {
+  position: relative;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-6) var(--space-3) var(--space-3);
+}
+
+.message {
+  margin: 0;
+}
+
+.link {
+  display: inline-block;
+  margin-top: var(--space-1);
+  color: var(--interactive);
+}
+
+.dismiss {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-muted);
+  padding: var(--space-1);
+  line-height: 1;
+}
+
+.dismiss:hover {
+  color: var(--ink-body);
+}

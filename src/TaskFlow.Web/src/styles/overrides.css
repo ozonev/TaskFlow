@@ -1,0 +1,71 @@
+/* Semantic role aliases over taskflow-tokens.css.
+   No new colour values — every var() below resolves to a step already defined in
+   tokens.css. Components reference these role names, never a ramp step directly,
+   so a step reassignment happens here rather than across the component tree.
+
+   Four assignments deliberately depart from the brief's literal text, because
+   §10's steps fail §8's own 4.5:1 contrast mandate at §9's type sizes. Ratios
+   computed against --color-bg (#f3f2f2) / white:
+
+     §10 primary button  --color-accent      #0088b0  4.07:1 white 14px  FAILS
+     here                --color-accent-700  #006786  6.39:1            passes
+     §9  metadata/label  --color-neutral-600 #7d7979  3.85:1 at 11-13px FAILS
+     here                --color-neutral-700 #605d5d  5.84:1            passes
+     §9  danger ink      --color-accent-2    #d6006c  4.61:1 marginal
+     here                --color-accent-2-700 #aa0b56 6.50:1            passes
+
+   --color-neutral-600 is retained below for hairlines and icons, where it is not
+   text and 4.5:1 does not apply. Base --color-accent-2 is retained for rules,
+   required marks and overdue dates per §9. */
+
+:root {
+  /* Ink */
+  --ink-body: var(--color-text); /* 14.85:1 */
+  --ink-muted: var(--color-neutral-700); /* §9 "Muted ink" — 5.84:1 */
+  --ink-meta: var(--color-neutral-700); /* §9 says -600; see header — 5.84:1 */
+  --ink-error: var(--color-accent-2-700); /* §9 says -2; see header — 6.50:1 */
+  --ink-on-accent: #ffffff; /* §10 "white text"; the only literal, and it is not a hue */
+
+  /* Non-text neutrals — 4.5:1 does not apply */
+  --hairline: var(--color-neutral-200); /* §9 "Hairline" — row rules */
+  --hairline-strong: var(--color-neutral-300); /* §9 "Hairline" — field borders */
+  --hairline-hover: var(--color-neutral-400); /* §10 text field hover border */
+  --icon-quiet: var(--color-neutral-600); /* icons only, never text */
+
+  /* Interactive */
+  --interactive: var(--color-accent-700); /* §10 says --color-accent; see header */
+  --interactive-hover: var(--color-accent-800); /* §10 says -600; see header */
+  --interactive-pressed: var(--color-accent-900); /* §10 says -700; see header */
+  --interactive-ring: var(--color-accent); /* §8 line 158 — focus ring, not text */
+  --tint-selected: var(--color-accent-100); /* §9 "Selected tint" */
+  --tint-selected-strong: var(--color-accent-200); /* §10 filter chip hover */
+  --ink-on-tint: var(--color-accent-800); /* §10 tag ink — 9.10:1 on -100 */
+
+  /* Attention */
+  --attention-rule: var(--color-accent-2); /* §9 — error rules, required marks, overdue */
+  --danger-surface: var(--color-accent-2-100);
+  --danger-ink: var(--color-accent-2-900); /* 13.3:1 on --danger-surface */
+
+  /* Surfaces */
+  --surface-quiet: var(--color-neutral-100); /* §10 disabled field fill */
+  --skeleton-tint: var(--color-neutral-200);
+  --skeleton-shimmer: var(--color-neutral-100);
+
+  /* §10 "Dialog — surface, shadow-lg, backdrop". The backdrop's own colour isn't
+     named in §9/§10, so it is derived here — once — from a token already in the
+     approved file, rather than as a literal color-mix() in a component
+     stylesheet (which styles/tokens.test.ts specifically forbids). */
+  --scrim: color-mix(in srgb, var(--color-neutral-900) 45%, transparent);
+}
+
+/* §9's type table assigns per-role line heights that the tokens file's global
+   `h1-h6 { line-height: 1.12 }` would otherwise impose 1.12 on. The .type-*
+   classes in type.css set the correct value per role; this resets the heading
+   elements themselves so an unclassed heading is not silently wrong. */
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: 1.2;
+}

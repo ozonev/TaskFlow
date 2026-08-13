@@ -1,0 +1,42 @@
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+/* §10 "Filter chip — accent-100 tint". */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: var(--tint-selected);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--ink-body);
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--tint-selected-strong);
+}
+
+.remove {
+  font-weight: 600;
+}
+
+.clearAll {
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+}
+
+.clearAll:hover {
+  color: var(--ink-body);
+}

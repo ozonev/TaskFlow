@@ -1,0 +1,14 @@
+/* §10 Tag: "accent-100 / accent-800 text" default; "overdue variant uses
+   accent-2 ink". */
+.tag {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--tint-selected);
+  color: var(--ink-on-tint);
+}
+
+.overdue {
+  background: var(--danger-surface);
+  color: var(--ink-error);
+}
