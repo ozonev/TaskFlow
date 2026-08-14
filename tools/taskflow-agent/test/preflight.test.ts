@@ -102,6 +102,50 @@ describe('runPreflight — a fresh run-id', () => {
   });
 });
 
+describe('runPreflight — API key / OAuth token', () => {
+  test('CLAUDE_CODE_OAUTH_TOKEN alone satisfies the check', () => {
+    delete process.env['ANTHROPIC_API_KEY'];
+    process.env['CLAUDE_CODE_OAUTH_TOKEN'] = 'test-oauth-token-not-real';
+    try {
+      const repoRoot = makeRepo();
+      const runId = nextRunId();
+      const worktree = path.join(os.tmpdir(), `tfa-wt-${runId}`);
+      tempRoots.push(worktree);
+      const artifactsDir = path.join(repoRoot, 'artifacts', runId);
+      const briefPath = makeBrief(artifactsDir);
+
+      const ctx = run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath }));
+
+      assert.equal(ctx.meta.createdBy, 'plan');
+    } finally {
+      delete process.env['CLAUDE_CODE_OAUTH_TOKEN'];
+      process.env['ANTHROPIC_API_KEY'] = 'test-key-not-real';
+    }
+  });
+
+  test('refuses when neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is set', () => {
+    delete process.env['ANTHROPIC_API_KEY'];
+    try {
+      const repoRoot = makeRepo();
+      const runId = nextRunId();
+      const worktree = path.join(os.tmpdir(), `tfa-wt-${runId}`);
+      tempRoots.push(worktree);
+      const artifactsDir = path.join(repoRoot, 'artifacts', runId);
+      const briefPath = makeBrief(artifactsDir);
+
+      assert.throws(
+        () => run(repoRoot, artifactsDir, planArgs({ worktree, runId, inputPath: briefPath })),
+        (error) =>
+          error instanceof PreflightError &&
+          /ANTHROPIC_API_KEY/.test(error.message) &&
+          /CLAUDE_CODE_OAUTH_TOKEN/.test(error.message),
+      );
+    } finally {
+      process.env['ANTHROPIC_API_KEY'] = 'test-key-not-real';
+    }
+  });
+});
+
 describe('runPreflight — protected branch', () => {
   test('refuses when --branch matches the detected default branch (origin/HEAD)', () => {
     const repoRoot = makeRepo();

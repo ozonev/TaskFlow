@@ -61,7 +61,7 @@ public sealed class CreateTaskEndpointTests(TaskFlowApiFactory factory) : IAsync
         Assert.Null(task.DueDate);
         Assert.InRange(task.CreatedAtUtc, before.AddSeconds(-1), DateTime.UtcNow.AddSeconds(1));
 
-        Assert.Equal($"{TasksUrl(projectId)}/{task.Id}", response.Headers.Location?.OriginalString);
+        Assert.Equal($"/api/tasks/{task.Id}", response.Headers.Location?.AbsolutePath);
     }
 
     [Fact]

@@ -1,0 +1,25 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.label {
+  color: var(--ink-muted);
+}
+
+/* Mirrors Field.module.css's .control — same treatment, different element. */
+.control {
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: var(--hairline-width) solid var(--hairline-strong);
+  border-radius: var(--radius-md);
+}
+
+.control:hover {
+  border-color: var(--hairline-hover);
+}
+
+.control:focus-visible {
+  border-color: var(--interactive-ring);
+}

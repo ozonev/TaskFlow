@@ -16,6 +16,9 @@ public sealed class TaskRepository(TaskFlowDbContext context) : ITaskRepository
     public async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken) =>
         await context.Tasks.AnyAsync(task => task.Id == id, cancellationToken);
 
+    public async Task<TaskItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        await context.Tasks.AsNoTracking().FirstOrDefaultAsync(task => task.Id == id, cancellationToken);
+
     public async Task<int> CountAsync(TaskSearchFilter filter, CancellationToken cancellationToken) =>
         await ApplyFilter(context.Tasks, filter).CountAsync(cancellationToken);
 

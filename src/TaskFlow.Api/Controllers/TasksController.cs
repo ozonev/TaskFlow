@@ -9,8 +9,27 @@ namespace TaskFlow.Api.Controllers;
 [Tags("Tasks")]
 public sealed class TasksController(
     CreateTaskHandler createHandler,
+    ListProjectTasksHandler listHandler,
     ILogger<TasksController> logger) : ControllerBase
 {
+    [HttpGet]
+    [ProducesResponseType<TaskSearchResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TaskSearchResponse>> ListAsync(
+        Guid projectId,
+        [FromQuery] ListProjectTasksRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await listHandler.HandleAsync(
+            new ListProjectTasksQuery(projectId, request.Page, request.PageSize),
+            cancellationToken);
+
+        return result is null
+            ? NotFound()
+            : Ok(TaskSearchResponse.FromResult(result));
+    }
+
     [HttpPost]
     [ProducesResponseType<TaskResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -31,15 +50,7 @@ public sealed class TasksController(
 
         logger.LogInformation("Created task {TaskId} for project {ProjectId}.", task.Id, task.ProjectId);
 
-        var response = new TaskResponse(
-            task.Id,
-            task.ProjectId,
-            task.Title,
-            task.Description,
-            task.Status,
-            task.DueDate,
-            task.CreatedAtUtc);
-
-        return Created($"/api/projects/{task.ProjectId}/tasks/{task.Id}", response);
+        return CreatedAtAction(
+            nameof(TaskSearchController.GetByIdAsync), "TaskSearch", new { id = task.Id }, TaskResponse.FromDto(task));
     }
 }

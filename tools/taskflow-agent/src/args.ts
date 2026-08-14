@@ -92,7 +92,8 @@ EXIT CODES
   3  turn ceiling reached
 
 ENVIRONMENT
-  ANTHROPIC_API_KEY        required; the SDK cannot reuse a Claude Code login
+  ANTHROPIC_API_KEY        required unless CLAUDE_CODE_OAUTH_TOKEN is set
+  CLAUDE_CODE_OAUTH_TOKEN  alternative to ANTHROPIC_API_KEY, from 'claude setup-token'
   JIRA_EMAIL, JIRA_API_TOKEN  required for intake; a personal Atlassian API token
 `;
 

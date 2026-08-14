@@ -9,6 +9,8 @@ public interface ITaskRepository
 
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken);
 
+    Task<TaskItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
     Task<int> CountAsync(TaskSearchFilter filter, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<TaskItem>> SearchAsync(

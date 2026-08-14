@@ -1,0 +1,7 @@
+# Normalizes line endings to LF in the repository and working tree,
+# regardless of a clone's local core.autocrlf setting — matching
+# .editorconfig's `end_of_line = lf`. Without this, Windows checkouts with
+# autocrlf=true keep re-introducing CRLF, and the next `dotnet format` (or
+# any other LF-respecting tool) flips it back, producing line-ending-only
+# diffs on files nobody actually edited.
+* text=auto eol=lf

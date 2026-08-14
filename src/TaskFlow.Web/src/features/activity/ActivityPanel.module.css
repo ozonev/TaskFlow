@@ -1,0 +1,29 @@
+.panel {
+  padding-block: var(--space-2);
+}
+
+.empty {
+  color: var(--ink-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entry {
+  padding-block: var(--space-3);
+  border-bottom: var(--hairline-width) solid var(--hairline);
+}
+
+.description {
+  color: var(--ink-muted);
+  margin-top: var(--space-1);
+}
+
+.timestamp {
+  display: block;
+  color: var(--ink-meta);
+  margin-top: var(--space-1);
+}

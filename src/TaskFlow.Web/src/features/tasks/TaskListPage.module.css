@@ -1,0 +1,16 @@
+.table {
+  width: 100%;
+  text-align: left;
+}
+
+.caption {
+  text-align: left;
+  margin-bottom: var(--space-3);
+  color: var(--ink-meta);
+}
+
+.table th {
+  padding-block: var(--space-2);
+  border-bottom: var(--hairline-width) solid var(--hairline-strong);
+  color: var(--ink-muted);
+}

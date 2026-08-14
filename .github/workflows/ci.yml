@@ -16,6 +16,7 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       taskflow-agent: ${{ steps.filter.outputs.taskflow-agent }}
+      webFrontend: ${{ steps.filter.outputs.webFrontend }}
     steps:
       - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v3
@@ -34,6 +35,8 @@ jobs:
               - '.github/workflows/ci.yml'
             taskflow-agent:
               - 'tools/taskflow-agent/**'
+            webFrontend:
+              - 'src/TaskFlow.Web/**'
 
   build-and-test:
     needs: changes
@@ -104,3 +107,36 @@ jobs:
 
       - name: Test
         run: npm test
+
+  frontend-build-and-test:
+    needs: changes
+    if: needs.changes.outputs.webFrontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/TaskFlow.Web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/TaskFlow.Web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

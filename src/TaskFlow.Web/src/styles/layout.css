@@ -1,0 +1,37 @@
+/* Numeric constants the brief specifies in §5/§6/§10 but which are NOT in
+   taskflow-tokens.css. Declared once here so they never appear as magic numbers
+   in a component. Each cites the brief line it comes from.
+
+   Breakpoints are the exception: CSS forbids var() inside @media, so 760px and
+   1100px appear as literals at their few use sites, each carrying a §5 comment.
+   The custom properties below document them; they cannot enforce them. */
+
+:root {
+  --content-max: 1200px; /* §5 line 106 — content column max, flush left */
+  --bp-narrow: 760px; /* §5 line 107 — the one breakpoint */
+  --bp-wide: 1100px; /* §5 line 108 — drawer fixed-width threshold */
+
+  --drawer-width: 470px; /* §5 line 108 — at ≥1100px */
+  --drawer-width-min: 380px; /* §5 line 108 — floor for the 40% viewport band */
+
+  --duration-drawer: 150ms; /* §6 line 122 — drawer slide */
+  --duration-dialog: 120ms; /* §6 line 122 — dialog fade */
+  --duration-skeleton: 1600ms; /* §6 line 122 mentions the shimmer; no period given, chosen */
+
+  --opacity-disabled: 0.45; /* §10 line 209 — disabled controls */
+  --opacity-pending: 0.6; /* §10 line 218 — optimistic comment while in flight */
+
+  --touch-target-min: 44px; /* §5 line 110 — below 760px */
+
+  --search-debounce: 300ms; /* §6 line 116 — documented here, applied in TS */
+  --loading-delay: 200ms; /* §7 line 150 — no loading state below this */
+
+  /* §8 line 158 specifies the focus ring exactly: 2px solid, 2px offset. */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* §9 names the Hairline role but never its width; §10 implies an active-tab and
+     selected-row indicator without sizing either. Both chosen here, once. */
+  --hairline-width: 1px;
+  --indicator-width: 2px;
+}
