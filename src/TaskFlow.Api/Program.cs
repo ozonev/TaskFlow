@@ -73,8 +73,6 @@ builder.Services.AddScoped<GetTaskAuditLogHandler>();
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-builder.Services.AddHealthChecks();
-
 // Narrow by design: only the origins listed under Cors:AllowedOrigins (Development's frontend
 // dev server) are allowed. Production has no such section, so this policy allows nothing there —
 // UseCors is also only ever called in Development below, so the middleware isn't even in the

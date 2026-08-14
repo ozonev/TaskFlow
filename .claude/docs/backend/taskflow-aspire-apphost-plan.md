@@ -39,7 +39,7 @@ Key design points:
 - Naming the **database resource** `DefaultConnection` (while the actual Postgres database inside the container is named `taskflow`) is what makes Aspire's `WithReference(db)` inject the connection string as `ConnectionStrings__DefaultConnection` — exactly the config key `Program.cs` already reads via `GetConnectionString("DefaultConnection")`. No changes needed to Api's connection-string logic.
 - `DatabaseProvider` still needs an explicit override — Api defaults to `"Sqlite"` otherwise.
 - `WithHttpHealthCheck("/health")` ties the dashboard's per-resource health indicator to the endpoint that already exists, satisfying "health ... endpoints already exposed" without adding a new one.
-- Pinning the Vite app's `PORT` to `5273` keeps it matching the CORS origin already whitelisted in `appsettings.Development.json` (`Cors:AllowedOrigins: ["http://localhost:5273"]`) — no CORS changes needed.
+- Pinning the Vite app's port to `5273` keeps it matching the CORS origin already whitelisted in `appsettings.Development.json` (`Cors:AllowedOrigins: ["http://localhost:5273"]`) — no CORS changes needed. This is done via `.WithEndpoint("http", e => { e.Port = 5273; e.IsProxied = false; })` in `AppHost.cs`, not a `vite.config.ts`/`PORT` env change: `AddViteApp` auto-registers its own `"http"` endpoint and assigns it a random port, and its CLI `--port` flag would override `vite.config.ts`/`PORT` either way, so `WithEndpoint` mutating the existing endpoint is the only lever that actually works.
 - `VITE_API_BASE_URL` is overridden at runtime with the Api resource's actual Aspire-assigned URL, on top of (not replacing) the checked-in `.env.development` default that the plain `npm run dev` path still uses.
 - `WithLifetime(ContainerLifetime.Persistent)` keeps the Postgres container/data across `dotnet run` sessions instead of tearing it down every launch.
 
@@ -50,8 +50,8 @@ Key design points:
 
 Add both new projects to `TaskFlow.slnx`. No CI changes needed: `.github/workflows/ci.yml`'s `code` path filter already covers `src/**`, `**/*.csproj`, `**/*.slnx`, `Directory.Packages.props`, etc., and `dotnet build TaskFlow.slnx` doesn't need Docker (only running/orchestrating the AppHost does).
 
-### 3. `src/TaskFlow.Web/vite.config.ts`
-Change the hardcoded `server: { port: 5273 }` to `server: { port: Number(process.env.PORT) || 5273 }` so Aspire's `AddViteApp` (which sets `PORT`) actually controls the listening port, while `npm run dev` outside Aspire keeps defaulting to today's `5273`. This is the only frontend code change needed.
+### 3. Frontend port
+No `src/TaskFlow.Web/vite.config.ts` change is needed: `AddViteApp` in `AppHost.cs` pins the port directly via `WithEndpoint` (see step 2 above), so `vite.config.ts`'s existing hardcoded `server: { port: 5273 }` — which is also what `npm run dev` outside Aspire still uses — stays untouched. No frontend code change is required for this plan.
 
 ### 4. Launch and drive it
 - `dotnet run --project src/TaskFlow.AppHost`, open the dashboard link it prints.
@@ -87,7 +87,6 @@ Per Claude Code's docs (`code.claude.com/docs/en/skills`), `/verify` is a bundle
 - `src/TaskFlow.AppHost/` — new project + `Program.cs`
 - `src/TaskFlow.Api/TaskFlow.Api.csproj` — add ServiceDefaults reference
 - `src/TaskFlow.Api/Program.cs` — add `builder.AddServiceDefaults()`
-- `src/TaskFlow.Web/vite.config.ts` — read `process.env.PORT`
 - `TaskFlow.slnx` — add the two new projects
 - `Directory.Packages.props` — new `PackageVersion` entries
 - `.claude/skills/run-taskflow/SKILL.md` and `smoke.ps1` (or its replacement) — regenerated to drive the AppHost
