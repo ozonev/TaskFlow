@@ -1,6 +1,11 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Without this, the SSH.NET PackageVersion below (pinned to patch a transitive
+         vulnerability pulled in via Testcontainers.PostgreSql) is inert: CPM only pins
+         versions for packages with a matching PackageReference unless transitive
+         pinning is turned on. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
     <!-- src/TaskFlow.Api -->
