@@ -6,11 +6,12 @@ export function useCreateTask(projectId: string): Mutation<CreateTaskBody, TaskR
   const client = useTaskFlowClient()
   return useMutation({
     mutate: (body) => client.createTask(projectId, body),
-    // Prefix ['tasks','search'] matches every search-query cache entry (all
-    // filter combinations, across projects) plus useTaskById's fallback query —
-    // but NOT a task's ['tasks', taskId, 'comments'|'audit'] entries, which sit
-    // under a different second segment. Refetching every open drawer's comments
-    // just because a new task was created elsewhere would be pure waste.
-    invalidates: [['tasks', 'search']],
+    // ['tasks','search'] matches every search-query cache entry (all filter
+    // combinations, across projects); ['tasks','list'] matches the plain
+    // project-task listing and the unfiltered-count query built on it. Neither
+    // matches a task's ['tasks','get'|'comments'|'audit', taskId] entries, which
+    // sit under a different second segment — refetching every open drawer's
+    // comments just because a new task was created elsewhere would be pure waste.
+    invalidates: [['tasks', 'search'], ['tasks', 'list']],
   })
 }

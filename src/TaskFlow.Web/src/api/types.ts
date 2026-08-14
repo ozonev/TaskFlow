@@ -65,6 +65,11 @@ export interface ListProjectsQuery {
   pageSize?: number
 }
 
+export interface ListProjectTasksQuery {
+  page?: number
+  pageSize?: number
+}
+
 export interface TaskSearchQuery {
   projectId?: string
   status?: TaskItemStatus

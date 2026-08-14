@@ -149,6 +149,53 @@ describe('task search', () => {
   })
 })
 
+describe('list project tasks', () => {
+  it('returns only tasks for the given project, unfiltered otherwise', async () => {
+    const api = client({ seed: 'large' })
+    const projects = await api.listProjects({ pageSize: 100 })
+    const projectId = projects.items[0]?.id
+    if (!projectId) throw new Error('seed produced no projects')
+
+    const listed = await api.listProjectTasks(projectId, {})
+    const searched = await api.searchTasks({ projectId, pageSize: 100 })
+    expect(listed.totalCount).toBe(searched.totalCount)
+    expect(listed.items.every((task) => task.projectId === projectId)).toBe(true)
+  })
+
+  it('404s for an unknown project, unlike searchTasks', async () => {
+    const error = await client()
+      .listProjectTasks('ffffffff-0000-4000-8000-000000000000', {})
+      .catch((caught: unknown) => caught)
+    expect(isApiError(error) && error.status).toBe(404)
+  })
+
+  it('orders tasks by createdAtUtc then id, ascending', async () => {
+    const api = client()
+    const projectId = await firstProjectId(api)
+    const page = await api.listProjectTasks(projectId, { pageSize: 100 })
+    const timestamps = page.items.map((task) => task.createdAtUtc)
+    expect([...timestamps].sort()).toEqual(timestamps)
+  })
+})
+
+describe('get task', () => {
+  it('returns the task by id', async () => {
+    const api = client()
+    const projectId = await firstProjectId(api)
+    const created = await api.createTask(projectId, { title: 'Look me up' })
+
+    const fetched = await api.getTask(created.id)
+    expect(fetched).toEqual(created)
+  })
+
+  it('404s for an unknown id', async () => {
+    const error = await client()
+      .getTask('ffffffff-0000-4000-8000-000000000000')
+      .catch((caught: unknown) => caught)
+    expect(isApiError(error) && error.status).toBe(404)
+  })
+})
+
 describe('create project', () => {
   it('trims before validating, so padding passes and is not stored', async () => {
     const project = await client().createProject({ name: '  Padded  ', description: '  spaced  ' })

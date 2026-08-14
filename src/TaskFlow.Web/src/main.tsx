@@ -21,13 +21,14 @@ if (!container) {
 }
 
 const client = createAppClient()
+const resetData = client.resetData
 
 createRoot(container).render(
   <StrictMode>
     <AppProviders
       client={client}
       mockController={client.controller}
-      resetMockData={() => client.resetData()}
+      resetMockData={resetData ? () => resetData() : undefined}
     >
       <RouterProvider router={createBrowserRouter(routes)} />
     </AppProviders>

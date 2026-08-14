@@ -8,7 +8,9 @@ namespace TaskFlow.Api.Controllers;
 [ApiController]
 [Route("api/tasks")]
 [Tags("Tasks")]
-public sealed class TaskSearchController(SearchTasksHandler searchHandler) : ControllerBase
+public sealed class TaskSearchController(
+    SearchTasksHandler searchHandler,
+    GetTaskByIdHandler getByIdHandler) : ControllerBase
 {
     [HttpGet("search")]
     [ProducesResponseType<TaskSearchResponse>(StatusCodes.Status200OK)]
@@ -28,22 +30,22 @@ public sealed class TaskSearchController(SearchTasksHandler searchHandler) : Con
             new SearchTasksQuery(filter, request.Page, request.PageSize),
             cancellationToken);
 
-        return Ok(ToResponse(result));
+        return Ok(TaskSearchResponse.FromResult(result));
     }
 
-    private static TaskSearchResponse ToResponse(SearchTasksResult result) => new(
-        result.Items.Select(ToResponse).ToArray(),
-        result.Page,
-        result.PageSize,
-        result.TotalCount,
-        result.TotalPages);
+    [HttpGet("{id:guid}")]
+    [ActionName(nameof(GetByIdAsync))]
+    [ProducesResponseType<TaskResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TaskResponse>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var task = await getByIdHandler.HandleAsync(id, cancellationToken);
 
-    private static TaskResponse ToResponse(TaskDto task) => new(
-        task.Id,
-        task.ProjectId,
-        task.Title,
-        task.Description,
-        task.Status,
-        task.DueDate,
-        task.CreatedAtUtc);
+        if (task is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(TaskResponse.FromDto(task));
+    }
 }

@@ -7,6 +7,7 @@ import {
   type CreateProjectBody,
   type CreateTaskBody,
   type ListProjectsQuery,
+  type ListProjectTasksQuery,
   type Paged,
   type ProjectResponse,
   type TaskResponse,
@@ -115,6 +116,20 @@ export function createMockClient(options: MockClientOptions = {}): MockClient {
       })
     },
 
+    listProjectTasks(projectId: string, query: ListProjectTasksQuery, options?: RequestOptions) {
+      return call('listProjectTasks', options, (): Paged<TaskResponse> => {
+        if (!store.findProject(projectId)) {
+          notFound()
+        }
+
+        const { page, pageSize } = pageParams(query.page, query.pageSize)
+        const matched = store.data.tasks
+          .filter((task) => task.projectId === projectId)
+          .sort(byCreatedThenId)
+        return paginate(matched, page, pageSize)
+      })
+    },
+
     searchTasks(query: TaskSearchQuery, options?: RequestOptions) {
       return call('searchTasks', options, (): Paged<TaskResponse> => {
         const errors = new ValidationErrors()
@@ -166,6 +181,12 @@ export function createMockClient(options: MockClientOptions = {}): MockClient {
           createdAtUtc: task.createdAtUtc,
         })
         return task
+      })
+    },
+
+    getTask(id: string, options?: RequestOptions) {
+      return call('getTask', options, (): TaskResponse => {
+        return store.findTask(id) ?? notFound()
       })
     },
 

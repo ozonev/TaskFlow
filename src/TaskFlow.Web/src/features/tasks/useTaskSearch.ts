@@ -43,13 +43,16 @@ export function useTaskSearch(
  * filtered result is empty AND a filter is active — via `enabled`, so the happy
  * path never pays for a second request. pageSize=1 keeps the payload minimal;
  * only `.totalCount` is read.
+ *
+ * Uses the plain project task listing, not searchTasks with an empty filter —
+ * this wants "how many tasks exist in this project", not a search result.
  */
 export function useUnfilteredTaskCount(projectId: string, enabled: boolean): QueryResult<number> {
   const client = useTaskFlowClient()
 
   const query = useQuery({
-    key: ['tasks', 'search', { projectId, unfiltered: true }],
-    fetch: ({ signal }) => client.searchTasks({ projectId, pageSize: 1 }, { signal }),
+    key: ['tasks', 'list', { projectId, unfiltered: true }],
+    fetch: ({ signal }) => client.listProjectTasks(projectId, { pageSize: 1 }, { signal }),
     enabled,
   })
 

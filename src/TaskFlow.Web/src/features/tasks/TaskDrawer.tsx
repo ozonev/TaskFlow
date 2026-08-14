@@ -30,10 +30,10 @@ export function TaskDrawer() {
 
   const location = useLocation()
   const close = useDialogClose(`/projects/${projectId}${location.search}`)
-  const task = useTaskById(projectId, taskId)
+  const task = useTaskById(taskId)
   const [activeTab, setActiveTab] = useState<Tab>('comments')
 
-  const notFound = task.status === 'success' && task.data === undefined
+  const notFound = isApiError(task.error) && task.error.status === 404
 
   return (
     <Dialog
@@ -42,7 +42,11 @@ export function TaskDrawer() {
       initialFocus="close"
       variant="drawer"
     >
-      {task.error ? (
+      {notFound ? (
+        <StateBlock tone="error" title="Task not found" action={<Button onClick={close}>Back to list</Button>}>
+          This task may have been removed.
+        </StateBlock>
+      ) : task.error ? (
         <StateBlock
           tone="error"
           title="Couldn't load this task"
@@ -50,10 +54,6 @@ export function TaskDrawer() {
           traceId={isApiError(task.error) ? task.error.problem.traceId : undefined}
         >
           Something went wrong while loading this task.
-        </StateBlock>
-      ) : notFound ? (
-        <StateBlock tone="error" title="Task not found" action={<Button onClick={close}>Back to list</Button>}>
-          This task may have been removed.
         </StateBlock>
       ) : task.showLoading || !task.data ? (
         <div className={styles.headerSkeleton} aria-busy="true">

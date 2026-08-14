@@ -55,6 +55,8 @@ builder.Services.AddScoped<GetProjectAuditLogHandler>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<CreateTaskHandler>();
 builder.Services.AddScoped<SearchTasksHandler>();
+builder.Services.AddScoped<GetTaskByIdHandler>();
+builder.Services.AddScoped<ListProjectTasksHandler>();
 
 builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 builder.Services.AddScoped<CreateCommentHandler>();

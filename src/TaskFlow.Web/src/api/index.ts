@@ -1,3 +1,5 @@
+import type { TaskFlowClient } from './client'
+import { createHttpClient } from './httpClient'
 import { createMockClient, type MockClient } from './mock/createMockClient'
 import {
   DEFAULT_MOCK_CONFIG,
@@ -8,19 +10,18 @@ import {
   type MockEndpoint,
 } from './mock/failure'
 
+/** What main.tsx renders against — the mock's extra members are optional so a real client fits too. */
+export type AppClient = TaskFlowClient & Partial<Pick<MockClient, 'controller' | 'resetData'>>
+
 /* THE SWAP POINT.
 
    This module is the only place that decides which TaskFlowClient the app runs
-   against. Everything else depends on the interface in client.ts. To move onto
-   the real API, add an httpClient.ts implementing TaskFlowClient and change the
-   one expression at the bottom of this file.
+   against. Everything else depends on the interface in client.ts.
 
-   Two things must be dealt with before that switch works:
-     - src/TaskFlow.Api/Program.cs configures no CORS policy, so a browser call
-       from a dev server on another origin is blocked. Either add a policy or
-       proxy /api through Vite.
-     - GET /api/tasks/{id} does not exist. features/tasks/useTaskById.ts carries
-       the temporary fallback and the note about removing it. */
+   The mock stays the default so the prototype keeps working with zero setup.
+   Set VITE_API_BASE_URL (e.g. in a gitignored .env.local) to run against the
+   real backend instead — vite.config.ts proxies /api to the backend in dev, so
+   no CORS policy in Program.cs is needed for that path. */
 
 const VALID_MODES: FailureMode[] = ['400', '404', '500', 'network']
 
@@ -29,8 +30,10 @@ const VALID_ENDPOINTS: (MockEndpoint | '*')[] = [
   'listProjects',
   'createProject',
   'getProject',
+  'listProjectTasks',
   'searchTasks',
   'createTask',
+  'getTask',
   'listComments',
   'createComment',
   'listTaskAudit',
@@ -90,6 +93,10 @@ export function parseMockConfig(search: string): MockConfig {
   return config
 }
 
-export function createAppClient(search = window.location.search): MockClient {
+export function createAppClient(search = window.location.search): AppClient {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL
+  if (baseUrl) {
+    return createHttpClient({ baseUrl })
+  }
   return createMockClient({ controller: new MockController(parseMockConfig(search)) })
 }
