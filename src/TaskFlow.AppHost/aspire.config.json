@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "TaskFlow.AppHost.csproj"
+  }
+}

@@ -11,6 +11,12 @@ using TaskFlow.Infrastructure.Persistence.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Wires OpenTelemetry/OTLP export, service discovery, and resilient HttpClient defaults so the
+// Aspire dashboard (src/TaskFlow.AppHost) shows logs/traces. Deliberately not paired with
+// MapDefaultEndpoints() below -- this app already maps its own /health unconditionally, and the
+// template's MapDefaultEndpoints() would remap /health (plus /alive) a second time.
+builder.AddServiceDefaults();
+
 builder.Services.AddOpenApi();
 
 builder.Services.AddControllers();
