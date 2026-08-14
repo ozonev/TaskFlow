@@ -18,10 +18,20 @@ export type AppClient = TaskFlowClient & Partial<Pick<MockClient, 'controller' |
    This module is the only place that decides which TaskFlowClient the app runs
    against. Everything else depends on the interface in client.ts.
 
-   The mock stays the default so the prototype keeps working with zero setup.
-   Set VITE_API_BASE_URL (e.g. in a gitignored .env.local) to run against the
-   real backend instead — vite.config.ts proxies /api to the backend in dev, so
-   no CORS policy in Program.cs is needed for that path. */
+   The real API is the default: .env.development (checked in) sets
+   VITE_API_BASE_URL to the backend's own origin, and Program.cs's Development-
+   only CORS policy (Cors:AllowedOrigins in appsettings.Development.json) is
+   what makes that cross-origin call work. To run against the mock instead —
+   e.g. offline frontend-only work — create a gitignored .env.local with
+   VITE_API_BASE_URL= (empty overrides the checked-in default; falsy fails the
+   check below and falls through to the mock).
+
+   This default only applies to `vite`/`npm run dev` — Vite loads .env files
+   per MODE, and `vite build`/`npm run preview` run in "production" mode, which
+   never reads .env.development. There's no .env.production yet (no deployment
+   target exists to point it at), so a built/previewed bundle falls back to the
+   mock. That's a deliberate gap, not a bug: it's a safe, working fallback
+   rather than a build that silently points at nothing. */
 
 const VALID_MODES: FailureMode[] = ['400', '404', '500', 'network']
 

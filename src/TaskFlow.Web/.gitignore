@@ -1,2 +1,6 @@
 dist/
 node_modules/
+
+# Personal overrides only — .env.development is checked in as the shared dev default.
+.env.local
+.env.*.local

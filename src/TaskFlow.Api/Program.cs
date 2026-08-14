@@ -69,6 +69,17 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddHealthChecks();
 
+// Narrow by design: only the origins listed under Cors:AllowedOrigins (Development's frontend
+// dev server) are allowed. Production has no such section, so this policy allows nothing there —
+// UseCors is also only ever called in Development below, so the middleware isn't even in the
+// pipeline outside it.
+var corsAllowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+    options.AddPolicy("Frontend", policy => policy
+        .WithOrigins(corsAllowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()));
+
 var app = builder.Build();
 
 app.UseExceptionHandler();
@@ -76,6 +87,7 @@ app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseCors("Frontend");
 
     using var scope = app.Services.CreateScope();
     await scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>().Database.MigrateAsync();
