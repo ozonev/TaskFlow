@@ -92,16 +92,27 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.UseCors("Frontend");
+}
 
+// TASKFLOW_APPLY_MIGRATIONS is a preview-only escape hatch (see docs/architecture/preview-environment.md
+// §6) safe only because that environment is pinned to a single replica -- it is NOT the production
+// migration strategy.
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("TASKFLOW_APPLY_MIGRATIONS"))
+{
     using var scope = app.Services.CreateScope();
     await scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>().Database.MigrateAsync();
 }
 
 app.UseHttpsRedirection();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapHealthChecks("/health");
 
 app.MapControllers();
+
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

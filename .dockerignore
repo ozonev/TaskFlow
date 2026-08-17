@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/node_modules/
+.git/
+.vs/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/appsettings.Development.json
+**/.env
+**/.env.development
+**/.env.local
+infra/
+docs/
+.claude/
+**/TestResults/
