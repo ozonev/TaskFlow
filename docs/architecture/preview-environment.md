@@ -2,7 +2,9 @@
 
 ## Purpose
 
-A short-lived, non-production environment on Azure Container Apps that a reviewer can hit at a stable URL to see a branch of TaskFlow running end to end (API + frontend + a persisted SQLite database), without standing up Postgres or any production-grade infrastructure. This document is the approved design; it intentionally contains no Terraform or Dockerfile — see [Follow-up work](#follow-up-work).
+A short-lived, non-production environment on Azure Container Apps that a reviewer can hit at a stable URL to see a branch of TaskFlow running end to end (API + frontend + a persisted PostgreSQL database), without any production-grade infrastructure. This document is the approved design; it intentionally contains no Terraform or Dockerfile — see [Follow-up work](#follow-up-work).
+
+**Revision note**: this preview originally used SQLite on an Azure Files SMB mount. That was replaced with PostgreSQL after a real deployment got stuck in `CrashLoopBackOff` — SQLite's exclusive-locking mechanism doesn't work reliably over SMB from a Linux container, confirmed by reproducing the identical `SQLite Error 5: database is locked` failure on a freshly deleted, brand-new database file (ruling out a stale-lock explanation; it failed on the very first write, every time). The app already supported PostgreSQL as a first-class `DatabaseProvider`, so switching to it — a real client-server database, not a file needing filesystem-level locks — was the fix, not a stylistic preference. §§3–6 below reflect the current, Postgres-based design.
 
 ## Verified Azure context
 
@@ -26,13 +28,13 @@ One resource group holds everything for this preview:
 
 ```
 rg-taskflow-preview (North Europe)
-├── log-taskflow-preview          Log Analytics workspace (30-day retention)
-├── cae-taskflow-preview          Container Apps Environment (Consumption)
-│   └── ca-taskflow-api-preview   Container App — min=max=1 replica
-│         └── volume "data" ──── Azure File share, mounted at /data
-├── sttaskflowpreview<suffix>     Storage account (StorageV2, Standard_LRS)
-│   └── fs-taskflow-data          Azure File share (5 GiB quota)
-└── acrtaskflowpreview<suffix>    Container Registry (Basic SKU)
+├── log-taskflow-preview                Log Analytics workspace (30-day retention)
+├── cae-taskflow-preview                Container Apps Environment (Consumption)
+│   └── ca-taskflow-api-preview         Container App — min=max=1 replica
+│         └── ConnectionStrings__DefaultConnection ──▶ psql-taskflow-preview-<suffix>
+├── psql-taskflow-preview-<suffix>      PostgreSQL Flexible Server (Burstable B1ms)
+│   └── taskflow                        Database
+└── acrtaskflowpreview<suffix>          Container Registry (Basic SKU)
 ```
 
 `<suffix>` is a 5-character lowercase-alphanumeric string (e.g. Terraform's `random_string`) appended to keep the two globally-unique, DNS-constrained resource names (storage account, registry) collision-free while respecting their naming rules (storage accounts: 3–24 lowercase-alphanumeric chars only).
@@ -58,29 +60,28 @@ The image is pushed to `acrtaskflowpreview<suffix>` (Basic SKU — cheapest ACR 
 - **Ingress**: external, so the preview is reachable from a browser outside Azure. Default `*.<environment-id>.northeurope.azurecontainerapps.io` FQDN with Azure-managed TLS — no custom domain.
 - **Target port**: `8080`, matching `ASPNETCORE_HTTP_PORTS=8080`.
 - **Health path**: `/health`, used for both liveness and readiness probes. A **startup probe** on the same path with a generous threshold (e.g. 10 attempts, 5s apart) is required because when `TASKFLOW_APPLY_MIGRATIONS=true` (§6), the container runs `Database.MigrateAsync()` before serving traffic — a tight liveness probe could otherwise kill the container mid-migration on cold start and cause a restart loop.
-- **Known gap**: `/health` today is a static liveness check only (`self` → always `Healthy`) — it does **not** check the SQLite file, the Azure Files mount, or DB connectivity. A broken file-share mount would report the container as healthy while every request 500s. Acceptable for a throwaway preview; a real DB/mount health check is out of scope here.
+- **Known gap**: `/health` today is a static liveness check only (`self` → always `Healthy`) — it does **not** check DB connectivity. A broken connection to Postgres would report the container as healthy while every request 500s. Acceptable for a throwaway preview; a real DB health check is out of scope here.
 
 ## 3. Single replica requirement
 
 `minReplicas: 1, maxReplicas: 1` — no autoscale rules of any kind, not even a placeholder HTTP-concurrency rule.
 
-This is a **data-safety constraint, not a cost optimization**: `/data/taskflow.db` lives on an Azure Files SMB share. SQLite's file-locking model assumes a single writer; SMB-backed locking across multiple container replicas is not a safe pattern for SQLite and can produce `database is locked` errors or, worse, silent corruption under concurrent writes. Scale-to-zero is also rejected — not for data safety, but because it defeats the point of a stable preview URL (cold-start delay, re-running the migration gate on every wake).
+**Revised rationale**: this was originally a data-safety constraint (SQLite's file-locking model doesn't tolerate multiple writers, and turned out not to tolerate even a single writer over Azure Files SMB — see the revision note above). PostgreSQL handles concurrent writers natively via row-level locking and MVCC, so the hard data-safety requirement no longer applies. The pin stays anyway, now as a **cost/simplicity choice**: nobody has asked for autoscaling, and adding it would be solving a problem this 14-day throwaway preview doesn't have. Scale-to-zero is still rejected for the same reason as before — it defeats the point of a stable preview URL.
 
-## 4. Azure Files mount at /data
+## 4. PostgreSQL database
 
-- **Storage account**: `sttaskflowpreview<suffix>` — `StorageV2`, `Standard_LRS` (cheapest redundancy tier — acceptable data-loss risk for a 14-day throwaway), `min_tls_version = TLS1_2`.
-- **File share**: `fs-taskflow-data`, quota **5 GiB** (SQLite files for this app are tiny; not a production sizing decision), `TransactionOptimized` access tier.
-- **Container Apps Environment storage definition**: name `taskflow-data` (the internal reference name used inside the Container App template — distinct from the file share's own name `fs-taskflow-data`), pointed at the storage account + share, `access_mode = ReadWrite`.
-- **Container App wiring**: a `volume { name = "data", storage_type = "AzureFile", storage_name = "taskflow-data" }` block plus a `volume_mounts { name = "data", path = "/data" }` block on the container definition.
-- **Credential note**: the storage account access key is supplied to the Container Apps Environment storage definition and therefore lands in the Terraform state file in plaintext. This is the concrete reason state protection (§8) matters here — the state file *is* a credential, not just a build artifact.
+- **Server**: `psql-taskflow-preview-<suffix>` — Azure Database for PostgreSQL **Flexible Server** (the only actively-supported Postgres offering on Azure; classic "Single Server" is retired), version 16, `B_Standard_B1ms` (Burstable, cheapest tier), 32 GiB storage (Flexible Server's platform-enforced floor regardless of SKU — not a sizing decision, real usage needs far less), 7-day backup retention, no geo-redundant backups, no high availability.
+- **Database**: `taskflow` (matches the name the local Aspire AppHost already uses), `UTF8` charset, `en_US.utf8` collation.
+- **Admin credentials**: login `taskflowadmin`, password generated via Terraform's `random_password` (24 chars, alphanumeric-only — deliberately no special characters, to avoid needing to escape anything inside the Npgsql keyword-value connection string). Exposed from `platform` as a `sensitive = true` output. Lands in the Terraform state file in plaintext regardless of the `sensitive` flag (which only redacts CLI output, not the state file) — the same accepted-risk pattern already documented for state protection (§8): the state file *is* a credential store here, not just a build artifact.
+- **Networking**: public access enabled, with a firewall rule allowing Azure-origin traffic (`start_ip_address`/`end_ip_address` = `0.0.0.0`, Azure's documented convention for "any Azure service") rather than VNet-integrating the Container Apps Environment — a much larger, costlier change not warranted here. This extends the same public-with-credential-gating posture the storage account already had by default in the SQLite design, rather than introducing a new risk category; the real access gate is the random password, not network isolation.
 
-## 5. SQLite connection
+## 5. PostgreSQL connection
 
-Environment variables set directly on the Container App (no Key Vault — not worth the added complexity for a throwaway preview with no real secret, just a mount path):
+The connection string is assembled in Terraform from `platform`'s outputs (host, database name, admin login, password) and wired into the Container App as a **Container Apps secret** (`secret { name = "db-connection-string", value = ... }`, referenced via `env { name = "ConnectionStrings__DefaultConnection", secret_name = "db-connection-string" }`) rather than a plain environment variable — unlike the SQLite connection string, this one carries a real credential, so it's kept out of the Container App's plain env-var listing.
 
-- `ConnectionStrings__DefaultConnection = Data Source=/data/taskflow.db` (double-underscore is ASP.NET Core's standard configuration-binding convention for `ConnectionStrings:DefaultConnection`, matching how `appsettings.Development.json` expresses the same key today with `Data Source=taskflow-dev.db`).
-- `DatabaseProvider = Sqlite` — matches `Program.cs`'s existing default, set explicitly so intent is visible in the Container App's env-var list rather than relying on the fallback.
-- `ASPNETCORE_ENVIRONMENT = Production` — deliberate: it keeps the existing `IsDevelopment()`-gated block (Swagger/OpenAPI, the Development CORS policy, and the pre-existing dev auto-migrate) fully inactive, so migration behavior in preview is controlled *only* by the explicit flag in §6, not tangled up with environment name. **Side effect**: Swagger/OpenAPI UI is not reachable on the preview URL (`MapOpenApi()` is Development-only) — accepted trade-off.
+- `ConnectionStrings__DefaultConnection = Host=<fqdn>;Port=5432;Database=taskflow;Username=taskflowadmin;Password=<random>` — standard Npgsql keyword-value format (double-underscore is ASP.NET Core's standard configuration-binding convention for `ConnectionStrings:DefaultConnection`).
+- `DatabaseProvider = Postgres` — selects `Program.cs`'s `UseNpgsql(...)` branch, which sets `MigrationsAssembly(PostgresMigrationsAssembly.Name)` to point at the already-existing, already-matching `TaskFlow.Infrastructure.Migrations.Postgres` migration set.
+- `ASPNETCORE_ENVIRONMENT = Production` — unchanged from the SQLite design; still keeps Swagger/CORS/dev-auto-migrate inactive, decoupled from the explicit migration flag in §6.
 
 ## 6. Preview-only migration behavior
 
@@ -100,9 +101,8 @@ For a real production path (out of scope here, noted for completeness): migratio
 | Log Analytics workspace | `log-taskflow-preview` | 30-day retention (practical minimum for the PerGB2018 SKU) |
 | Container Apps Environment | `cae-taskflow-preview` | Consumption only, no dedicated workload profiles |
 | Container App | `ca-taskflow-api-preview` | min=max=1 replica, 0.5 vCPU / 1 GiB |
-| Storage account | `sttaskflowpreview<suffix>` | lowercase alphanumeric only, ≤24 chars |
-| Azure File share | `fs-taskflow-data` | 5 GiB, TransactionOptimized |
-| Container Apps env storage ref | `taskflow-data` | internal name in the volume block; distinct from the file share's own name |
+| PostgreSQL Flexible Server | `psql-taskflow-preview-<suffix>` | Burstable B1ms, PostgreSQL 16 |
+| PostgreSQL database | `taskflow` | matches the name AppHost uses locally |
 | Container Registry | `acrtaskflowpreview<suffix>` | alphanumeric only, no hyphens, Basic SKU |
 
 Naming convention: `<type-abbrev>-taskflow-preview` for resources that allow hyphens; `<typeabbrev>taskflowpreview<suffix>` (no hyphens, lowercase) for globally-unique DNS-constrained resources (storage, registry). No region suffix — single-region, short-lived, not worth the extra length.
@@ -152,15 +152,16 @@ crash.*.log
 
 ## Not in scope for this preview
 
-Postgres, multi-region deployment, autoscaling, and any production-grade high-availability feature are deliberately excluded — all of them contradict the single-replica/SQLite/short-lived-preview framing this design is built around.
+Multi-region deployment, autoscaling, and any production-grade high-availability feature (for either the Container App or the PostgreSQL server) are deliberately excluded — all of them contradict the single-replica/short-lived-preview framing this design is built around.
 
 ## Open assumptions / risks
 
-- **Pricing not verified** against the live Azure pricing API — Consumption Container Apps, Standard_LRS storage, and ACR Basic costs are assumed directionally cheap, not confirmed.
+- **Pricing not verified** against the live Azure pricing API — Consumption Container Apps, Postgres Flexible Server Burstable B1ms, and ACR Basic costs are assumed directionally cheap, not confirmed. Unlike the SQLite design, this one has a second continuously-billed resource (the Postgres server itself), not just the Container App.
 - **Quota headroom not verified** (see table above) — re-check with `az quota list` (after installing the `quota` CLI extension) before relying on this if usage ever grows beyond one preview replica.
-- **`/health` is liveness-only** (§2) — a mounted-but-broken file share would not be caught by the probe.
+- **`/health` is liveness-only** (§2) — a broken Postgres connection would not be caught by the probe.
 - **No CORS changes needed** — because the frontend is same-origin with the API (§1), the existing Development-only CORS policy stays untouched and simply unused in preview.
-- **Storage account key in Terraform state** (§4/§8) — the concrete reason local state must never be committed.
+- **Postgres admin password in Terraform state** (§4/§8) — the concrete reason local state must never be committed; the `sensitive` output flag only redacts CLI output, not the state file itself.
+- **Public network access on the Postgres server** (§4) — gated by a random 24-char password rather than network isolation, since no VNet integration exists for the Container Apps Environment. Acceptable for a 14-day throwaway; would need revisiting for anything longer-lived.
 
 ## Follow-up work
 

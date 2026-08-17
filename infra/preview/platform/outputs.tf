@@ -10,20 +10,21 @@ output "container_apps_environment_id" {
   value = azurerm_container_app_environment.this.id
 }
 
-output "container_apps_environment_storage_name" {
-  value = azurerm_container_app_environment_storage.this.name
+output "postgres_fqdn" {
+  value = azurerm_postgresql_flexible_server.this.fqdn
 }
 
-output "storage_account_name" {
-  value = azurerm_storage_account.this.name
+output "postgres_database_name" {
+  value = azurerm_postgresql_flexible_server_database.this.name
 }
 
-output "storage_account_id" {
-  value = azurerm_storage_account.this.id
+output "postgres_admin_login" {
+  value = azurerm_postgresql_flexible_server.this.administrator_login
 }
 
-output "file_share_name" {
-  value = azurerm_storage_share.this.name
+output "postgres_admin_password" {
+  value     = random_password.postgres_admin.result
+  sensitive = true
 }
 
 output "container_registry_id" {

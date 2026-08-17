@@ -15,6 +15,11 @@ resource "azurerm_container_app" "this" {
     identity = data.terraform_remote_state.platform.outputs.user_assigned_identity_id
   }
 
+  secret {
+    name  = "db-connection-string"
+    value = local.postgres_connection_string
+  }
+
   ingress {
     external_enabled = true
     target_port      = 8080
@@ -44,6 +49,11 @@ resource "azurerm_container_app" "this" {
         }
       }
 
+      env {
+        name        = "ConnectionStrings__DefaultConnection"
+        secret_name = "db-connection-string"
+      }
+
       liveness_probe {
         transport = "HTTP"
         path      = "/health"
@@ -65,17 +75,6 @@ resource "azurerm_container_app" "this" {
         interval_seconds        = 5
         failure_count_threshold = 10
       }
-
-      volume_mounts {
-        name = "data"
-        path = "/data"
-      }
-    }
-
-    volume {
-      name         = "data"
-      storage_type = "AzureFile"
-      storage_name = data.terraform_remote_state.platform.outputs.container_apps_environment_storage_name
     }
   }
 }
