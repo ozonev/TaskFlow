@@ -78,7 +78,7 @@ Layer-specific conventions live next to the code they govern and load automatica
 
 ## Protected paths
 
-`.claude/settings.json` denies `Edit`/`Write` on secrets/deployment-credential paths (`.env*`, `appsettings.Production.json`, `*.pfx`, `*.publishsettings`, `*.pubxml`, `PublishScripts/**`). This only constrains those two tools — `Bash`/`PowerShell` can still write these paths via shell redirection, so it's not a substitute for keeping real secrets out of the repo entirely.
+`.claude/settings.json` denies `Edit`/`Write` on secrets/deployment-credential paths (`.env*`, `appsettings.Production.json`, `*.pfx`, `*.publishsettings`, `*.pubxml`, `PublishScripts/**`) and on Terraform state/plan/production-variable paths (`*.tfstate`, `*.tfstate.*`, `*.tfplan`, `*.production.tfvars` — see `docs/architecture/preview-guardrails.md` for why each exists). This only constrains those two tools — `Bash`/`PowerShell` can still write these paths via shell redirection, so it's not a substitute for keeping real secrets/state out of reach entirely. A `PreToolUse` hook (`.claude/hooks/validate-terraform-target.ps1`) separately blocks any `terraform plan/apply/destroy/init` whose resolved working directory, live Azure subscription/tenant, or workspace doesn't match the approved preview configuration — that's a dynamic, resolved-value check (not a static path), which is why it's a hook rather than another permission rule.
 
 ## Adding dependencies
 
