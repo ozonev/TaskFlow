@@ -8,15 +8,17 @@ A short-lived, non-production environment on Azure Container Apps that a reviewe
 
 | Item | Value |
 |---|---|
-| Tenant | `a0c01160-86c9-4406-8a44-392e8b9c6d9b` ("Default Directory", `vitaliyilchenkonixsolutions.onmicrosoft.com`) |
-| Subscription | `ad925f8c-465f-45b4-9632-f6286e0f30e4` — **"Visual Studio Professional"**, state `Enabled` |
-| Current identity | `admin@vitaliyilchenkonixsolutions.onmicrosoft.com` (`vitaliy.ilchenko@nixsolutions.com`) — **Owner** at subscription scope |
+| Tenant | `<tenant-id>` ("Default Directory", `<tenant-domain>`) |
+| Subscription | `<subscription-id>` — **"Visual Studio Professional"**, state `Enabled` |
+| Current identity | `<sign-in-identity>` — **Owner** at subscription scope |
 | Target region | **North Europe** |
 | Explicitly non-production? | **Yes.** This is an individual Visual Studio (dev/test) subscription, not a shared team subscription. Its offer terms restrict it to non-production/internal use. It carries **no org-level naming or tagging policy** (`az policy definition list` returns no custom policies — only the default Microsoft Defender for Cloud audit initiative), so the conventions below are proposed fresh rather than inherited. |
 | Relevant quota | **Not formally verified.** The `az quota` CLI extension requires an interactive install, which is unavailable in the environment this was checked from. Working assumption, not a verified fact: Consumption-plan Container Apps don't draw on the traditional per-subscription vCPU quota that VMs do, and default subscription limits should comfortably cover a single 0.5 vCPU / 1 GiB replica. Re-check with `az quota list` before relying on this if the deployment is ever scaled beyond one preview app. |
 | Prerequisite | `Microsoft.App` (Container Apps) resource provider is currently **`NotRegistered`** on this subscription (`Microsoft.Storage` and `Microsoft.OperationalInsights` already are). Run `az provider register -n Microsoft.App --wait` once before the first `terraform apply` — otherwise Terraform's `azurerm` provider will auto-register it on first apply, which just makes that apply slower and easy to mistake for a hang. |
 
-**Auth note:** the Azure MCP tool available in this environment had a cached credential scoped to a *different* tenant (`f8cdef31-...`) than the Azure CLI session used here, and 401'd on every resource-level call. All verification above was done via `az` CLI directly, using the CLI's authenticated session as the source of truth (confirmed with the resource owner).
+**Auth note:** the Azure MCP tool available in this environment had a cached credential scoped to a *different* tenant (`<other-tenant-id>`) than the Azure CLI session used here, and 401'd on every resource-level call. All verification above was done via `az` CLI directly, using the CLI's authenticated session as the source of truth (confirmed with the resource owner).
+
+**Redaction note:** the real tenant ID, subscription ID, and identity email verified above have been replaced with placeholders in this committed doc — this repository is public, and those values are real identifiers tied to a personal Azure account rather than content the architecture decisions in this doc depend on. The real values are recorded internally outside this file.
 
 ## Topology
 
@@ -114,6 +116,8 @@ owner        = "vitalii.ilchenko@nixs.com"
 expiry-date  = "2026-08-28"
 managed-by   = "terraform"
 ```
+
+**Note on the `owner` value**: it intentionally holds the resource owner's routine work email, not the email of the Azure sign-in identity used to provision these resources (redacted above) — the two differ by design, not by typo. The Azure account and the person's usual point of contact aren't always the same address, and the tag is meant to answer "who do I email about this resource," not "which account created it."
 
 ## 8. State ownership and .gitignore rules
 
