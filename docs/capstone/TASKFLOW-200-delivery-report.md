@@ -4,7 +4,7 @@
 
 **Ticket:** [TASKFLOW-9 — Add project labels and task filtering](https://taskflowtest.atlassian.net/browse/TASKFLOW-9)
 **Branch:** `Module17`
-**Final commits:** `1750589` (feature), `4f72596` (fix), `3b78438` (test fix) — see [Commits](#commits)
+**Final commits:** `1750589` (feature), `4f72596` (fix), `3b78438` (test fix), `bc3fe20` (PR review fix) — see [Commits](#commits)
 
 ## Approved scope
 
@@ -42,7 +42,7 @@ Full-stack vertical slice — no label support existed anywhere in the repo befo
 - `Label` and `TaskLabel` (join) domain entities; `AuditEventType` extended with `LabelCreated`/`TaskLabelAssigned`
 - `ILabelRepository`, `ITaskLabelRepository`; `TaskSearchFilter` extended with `LabelId` (default-valued, so no existing call site needed updating)
 - `CreateLabelHandler`, `ListLabelsHandler`, `AssignTaskLabelHandler`; `TaskDto` extended with `Labels`, threaded through `CreateTaskHandler`/`GetTaskByIdHandler`/`SearchTasksHandler`
-- `LabelConfiguration`/`TaskLabelConfiguration` (unique index on `(ProjectId, Name)`; index on `LabelId` for the filter join); `TaskRepository.ApplyFilter` extended with a correlated-subquery label predicate
+- `LabelConfiguration`/`TaskLabelConfiguration` (case-insensitive-in-effect unique index on `(ProjectId, NameNormalized)`, a shadow column kept in sync by `TaskFlowDbContext` for every Label write; index on `LabelId` for the filter join); `TaskRepository.ApplyFilter` extended with a correlated-subquery label predicate
 - `LabelsController` (`POST`/`GET /api/projects/{projectId}/labels`), `TaskLabelsController` (`POST /api/tasks/{taskId}/labels`); `TaskSearchController`/`SearchTasksRequest`/`TaskResponse` extended for label filtering and label chips on tasks
 - `ConcurrentWriteConflictException` — a new Application-layer abstraction Infrastructure's `UnitOfWork` throws (translated from EF Core's `DbUpdateException`) so Application handlers can react to a lost race without taking an EF Core dependency; used by both `CreateLabelHandler` and `AssignTaskLabelHandler` to keep their duplicate-name/idempotent-assign guarantees correct under genuine concurrency (see [Review findings](#review-findings-and-resolutions))
 
@@ -57,10 +57,12 @@ Full-stack vertical slice — no label support existed anywhere in the repo befo
 ## Migration
 
 `AddLabels`, generated for both providers per `.claude/rules/ef-core.md`:
-- SQLite: `20260818131714_AddLabels`
-- Postgres: `20260818131733_AddLabels`
+- SQLite: `20260818154738_AddLabels`
+- Postgres: `20260818154816_AddLabels`
 
-Applied to the local SQLite dev database via `dotnet ef database update`. Confirmed applying cleanly against a real PostgreSQL container via the `Category=Postgres` test suite, and again on the live preview deployment (see [Preview deployment](#preview-deployment)).
+(Regenerated in place once, after the PR-review round closed the case-insensitive-uniqueness gap below — the original `AddLabels` migration was never applied to any persistent environment, so it was amended rather than layering a follow-up migration for a fix to code introduced in this same PR.)
+
+Applied to the local SQLite dev database via `dotnet ef database update`. Confirmed applying cleanly against a real PostgreSQL container via the `Category=Postgres` test suite. The live preview deployment (see [Preview deployment](#preview-deployment)) ran the pre-regeneration version of this migration (exact-case unique index only) — the preview was already destroyed by the time the PR review surfaced the case-insensitivity gap, so the regenerated migration's clean apply is verified locally and via the Postgres-container test suite only, not against a second live preview run.
 
 ## Commands and tests actually run
 
@@ -68,7 +70,7 @@ Applied to the local SQLite dev database via `dotnet ef database update`. Confir
 ```
 dotnet build
 dotnet test --filter-not-trait "Category=Postgres"   # 215 passed
-dotnet test --filter-trait "Category=Postgres"       # 2 passed (ConcurrentProjectCreationTests, ConcurrentDuplicateLabelNameTests)
+dotnet test --filter-trait "Category=Postgres"       # 3 passed (ConcurrentProjectCreationTests + 2 ConcurrentDuplicateLabelNameTests cases)
 dotnet ef migrations add AddLabels --project src/TaskFlow.Infrastructure --startup-project src/TaskFlow.Api
 dotnet ef migrations add AddLabels --project src/TaskFlow.Infrastructure.Migrations.Postgres --startup-project src/TaskFlow.Api   # DatabaseProvider=Postgres
 dotnet ef database update --project src/TaskFlow.Infrastructure --startup-project src/TaskFlow.Api
@@ -107,6 +109,15 @@ Two independent review passes: the `dotnet-reviewer` subagent, and a separately-
 
 All fixes verified: 215 backend tests (SQLite) + 2 Postgres-tagged tests + 211 frontend tests + lint, all green after every fix.
 
+### PR review round (GitHub Actions automated review, after pushing to `origin/Module17`)
+
+A third, independent review — the repo's `auto-review` GitHub Actions workflow — ran against PR #10 and posted two inline findings, both about a comment claiming a stronger guarantee than the code actually provided:
+
+| Finding | Resolution |
+|---|---|
+| `LabelConfiguration.cs`'s unique index was exact-case, strictly weaker than the case-insensitive `ExistsByNameAsync` pre-check it was meant to backstop — two concurrent creates for differently-cased names (`"Urgent"`/`"urgent"`) could both pass the pre-check *and* both satisfy an exact-case index, silently producing two "duplicate" labels with no error at all. `ConcurrentDuplicateLabelNameTests` only covered the identical-string race. | **Fixed**, not just documented. Added a `NameNormalized` shadow column (lowercased `Name`) with the unique index actually built on `(ProjectId, NameNormalized)`, kept in sync centrally in `TaskFlowDbContext.SaveChanges(Async)` for every `Label` write — not in the repository, so no future call site can forget it. Required regenerating the `AddLabels` migration (see [Migration](#migration)). **Proven against real Postgres**: added `ConcurrentPostsWithDifferentlyCasedSameName_ExactlyOneSucceeds_RestAre400NotError`, cycling four casings of the same name across 20 concurrent requests — exactly one 201, the rest clean 400s, one row persisted. |
+| `ITaskLabelRepository.AssignAsync`'s doc comment claimed "a no-op if the pair already exists," but the implementation has no such check — it throws on the composite-PK conflict. The apparent idempotency is a property of `AssignTaskLabelHandler`'s own pre-check-then-catch orchestration, not of `AssignAsync` in isolation; making `AssignAsync` self-idempotent isn't safe without the same rollback-then-requery pattern the handler already uses, which requires owning the transaction boundary `AssignAsync` doesn't own. | **Fixed by correcting the comment** to describe the actual contract (throws on conflict; callers must pre-check and handle `ConcurrentWriteConflictException` themselves) rather than overclaiming a guarantee the method can't safely provide alone. |
+
 ## Playwright result and artifact location
 
 - Local full suite: 3/3 passed (`tests/TaskFlow.E2ETests`, HTML report at `tests/TaskFlow.E2ETests/playwright-report/`)
@@ -129,19 +140,21 @@ Fixed with one line (`app.UseRouting();` placed after `UseStaticFiles`/`UseDefau
 ## Known limitations
 
 - No label unassign/remove/rename/delete — out of scope per the ticket; a task's label set can only grow via the current UI.
-- `CreateLabelHandler`'s duplicate-name uniqueness is exact-case at the DB level (the unique index), while the application-level pre-check is case-insensitive — a race between two concurrent inserts differing only in case is now handled correctly (proven against real Postgres), but this is the same class of race this codebase already tolerates for Project names.
+- None remaining on the label-name-uniqueness race — the DB-level backstop is now genuinely case-insensitive (`NameNormalized`), closing the gap the automated PR review caught (see [PR review round](#pr-review-round-github-actions-automated-review-after-pushing-to-originmodule17)). Project names still have no uniqueness constraint at all (case-sensitive or otherwise) — that's pre-existing, out of this ticket's scope, and this codebase's own `ConcurrentProjectCreationTests` documents it as accepted behavior for Projects specifically.
 - The pre-existing static-file-serving bug (fixed in `4f72596`) had presumably been latent since `MapFallbackToFile` was first introduced for this repo's SPA hosting — this delivery is the first time a real browser-based smoke test ran against an actual container deployment, so it's plausible (though unconfirmed) that no prior preview deployment ever rendered a working UI either.
 - Manual smoke testing and the concurrency test used the AppHost/Postgres-container path and a real preview Postgres server respectively — no additional persistence testing beyond what's described above.
 
 ## PR-ready summary
 
-**TASKFLOW-9 — Add project labels and task filtering.** Adds a `Label` entity scoped per project, a many-to-many Task↔Label relationship, single-select label filtering combined with the existing status filter, a "Manage labels" dialog, and label assignment from the task drawer. Includes EF Core migrations for both SQLite and Postgres. Duplicate label names and cross-project label assignment are rejected as 400s reusing the existing validation-error UI path; both are proven race-safe under genuine concurrent load against a real Postgres container. A new Playwright journey covers create → label → assign → filter → reload, verified both locally and against a live preview deployment. Along the way, fixed a pre-existing, unrelated static-file-serving defect discovered during that preview verification (separate commit).
+**TASKFLOW-9 — Add project labels and task filtering.** Adds a `Label` entity scoped per project, a many-to-many Task↔Label relationship, single-select label filtering combined with the existing status filter, a "Manage labels" dialog, and label assignment from the task drawer. Includes EF Core migrations for both SQLite and Postgres. Duplicate label names (case-insensitively, including under concurrent creation) and cross-project label assignment are rejected as 400s reusing the existing validation-error UI path; both are proven race-safe under genuine concurrent load against a real Postgres container. A new Playwright journey covers create → label → assign → filter → reload, verified both locally and against a live preview deployment. Along the way, fixed a pre-existing, unrelated static-file-serving defect discovered during preview verification, and closed a case-insensitivity gap the repo's automated PR review caught after pushing (both separate commits).
 
-Suggested commit sequence (already applied, in this branch):
+Commit sequence (already applied, in this branch):
 1. `feat: add project labels and task filtering` (`1750589`)
 2. `fix: static files skipped when SPA fallback matches first` (`4f72596`)
 3. `test: disambiguate label-assignment locator in label-filter E2E spec` (`3b78438`)
-4. `docs: add TASKFLOW-200 delivery report` (this file)
+4. `docs: add TASKFLOW-200 delivery report` (`9ada9fb`)
+5. `fix: close case-insensitive duplicate-label race caught by PR review` (`bc3fe20`)
+6. `docs: update delivery report for PR review fix` (this update)
 
 ## Cleanup result and owner
 
