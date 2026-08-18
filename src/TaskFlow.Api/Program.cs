@@ -115,6 +115,13 @@ app.UseHttpsRedirection();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+// Explicit rather than relying on WebApplication's implicit auto-insertion: without it, routing
+// is inserted very early in the pipeline, so the MapFallbackToFile catch-all below matches every
+// non-API request (including real asset files) before UseStaticFiles gets a chance to serve them
+// -- StaticFileMiddleware silently skips itself once an endpoint is already matched. Placing this
+// after UseStaticFiles guarantees static files are served first.
+app.UseRouting();
+
 app.MapHealthChecks("/health");
 
 app.MapControllers();
