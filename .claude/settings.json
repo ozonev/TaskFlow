@@ -14,10 +14,30 @@
       "Edit(**/*.pubxml)",
       "Write(**/*.pubxml)",
       "Edit(**/PublishScripts/**)",
-      "Write(**/PublishScripts/**)"
+      "Write(**/PublishScripts/**)",
+      "Edit(**/*.tfstate)",
+      "Write(**/*.tfstate)",
+      "Edit(**/*.tfstate.*)",
+      "Write(**/*.tfstate.*)",
+      "Edit(**/*.tfplan)",
+      "Write(**/*.tfplan)",
+      "Edit(**/*.production.tfvars)",
+      "Write(**/*.production.tfvars)"
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"${CLAUDE_PROJECT_DIR}/.claude/hooks/validate-terraform-target.ps1\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|Bash|PowerShell",

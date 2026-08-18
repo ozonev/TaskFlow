@@ -92,16 +92,29 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.UseCors("Frontend");
+}
 
+// TASKFLOW_APPLY_MIGRATIONS is a preview-only escape hatch (see docs/architecture/preview-environment.md
+// §6) safe only because that environment is pinned to a single replica -- it is NOT the production
+// migration strategy.
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("TASKFLOW_APPLY_MIGRATIONS"))
+{
     using var scope = app.Services.CreateScope();
     await scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>().Database.MigrateAsync();
 }
 
 app.UseHttpsRedirection();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapHealthChecks("/health");
 
 app.MapControllers();
+
+// Regex-excludes "api" so an unmatched/typo'd API route 404s instead of falling through to the
+// SPA shell with a 200 -- MapControllers() above already claims every real API route first.
+app.MapFallbackToFile("{*path:regex(^(?!api).*$)}", "index.html");
 
 app.Run();
 
