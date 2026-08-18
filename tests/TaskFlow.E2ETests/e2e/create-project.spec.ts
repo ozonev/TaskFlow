@@ -10,10 +10,11 @@ test('creating a project persists across reload', { tag: '@preview-smoke' }, asy
   await createProject(page, uniqueName, 'Created by Playwright E2E')
   await findProjectLink(page, uniqueName)
 
-  // Reload proves persistence, not React/query-cache state: .env.development's
-  // VITE_API_BASE_URL is truthy, so the real HTTP client is always used
-  // (never the mock-client fallback in src/api/index.ts) — and, against the
-  // preview target, there is no mock client at all.
+  // Reload proves persistence, not React/query-cache state: both
+  // .env.development's and .env.production's VITE_API_BASE_URL are truthy,
+  // so the real HTTP client is always used (never the mock-client fallback
+  // in src/api/index.ts) — true whether this runs locally or, via the
+  // @preview-smoke tag, against the preview target's built bundle.
   await page.reload()
   await findProjectLink(page, uniqueName)
 })
