@@ -1,0 +1,85 @@
+name: Preview smoke
+
+# Manual only, deliberately: there is no automated per-PR preview deployment
+# in this repo (the preview environment is stood up by hand via the
+# /deploy-preview-env Claude Code skill — see docs/architecture/
+# preview-guardrails.md). There is no default URL anywhere below; that is
+# what keeps this from ever pointing at production by accident, not a
+# convention someone has to remember.
+on:
+  workflow_dispatch:
+    inputs:
+      preview_base_url:
+        description: 'Preview URL to test (e.g. https://<container-app-fqdn>). Leave blank to use the "preview" environment''s PREVIEW_BASE_URL variable instead.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    # Requires a repo admin to configure required reviewers on a GitHub
+    # Environment named "preview" (Settings -> Environments) for this to
+    # actually gate anything — declaring it here is necessary but not
+    # sufficient on its own.
+    environment: preview
+    permissions:
+      contents: read
+    env:
+      PREVIEW_BASE_URL: ${{ inputs.preview_base_url || vars.PREVIEW_BASE_URL }}
+    steps:
+      - name: Require a target URL
+        run: |
+          if [ -z "$PREVIEW_BASE_URL" ]; then
+            echo "::error::No preview URL supplied — pass preview_base_url or set the 'preview' environment's PREVIEW_BASE_URL variable. Refusing to guess a target." >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/TaskFlow.E2ETests/package-lock.json
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('tests/TaskFlow.E2ETests/package-lock.json') }}
+
+      - name: Install E2E test dependencies
+        working-directory: tests/TaskFlow.E2ETests
+        run: npm ci
+
+      # PREVIEW_BASE_URL being set makes playwright.config.ts skip its local
+      # webServer entirely and point use.baseURL at this target instead —
+      # nothing local is built, migrated, or cleaned up in this mode.
+      - name: Run preview smoke suite
+        working-directory: tests/TaskFlow.E2ETests
+        run: npx playwright test --grep "@preview-smoke"
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-smoke-report
+          path: |
+            tests/TaskFlow.E2ETests/playwright-report/
+            tests/TaskFlow.E2ETests/test-results/
+          retention-days: 7
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "### Preview smoke" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Result: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Target: $PREVIEW_BASE_URL" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ job.status }}" != "success" ]; then
+            echo "- See the **preview-smoke-report** artifact for trace/screenshot/video evidence." >> "$GITHUB_STEP_SUMMARY"
+          fi

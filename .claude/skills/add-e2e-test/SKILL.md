@@ -71,11 +71,14 @@ the current one lacks — which a new page/route served by the same two servers 
 - The projects list is ordered ascending by `CreatedAtUtc` with a fixed page size of 20
   (`DEFAULT_PAGE_SIZE` in `src/TaskFlow.Web/src/lib/constants.ts`; `page` — but not page size — is
   controllable via the `?page=` URL param, see `useProjects.ts`). A test that asserts a just-created
-  row is visible without navigating is implicitly assuming the run's cumulative project count across
-  **all** specs stays under 20 — true today with one spec, not guaranteed once more accumulate in the
-  same run. Before adding a spec that could push the total over that line, either read the table's
-  caption (`"{totalCount} project(s), page X of Y"`) and navigate to the last page, or otherwise avoid
-  relying on page 1.
+  row is visible without navigating is implicitly assuming the cumulative project count stays under
+  20. Locally that only breaks once several specs share one run (the harness resets per run, not
+  globally). **Against the preview environment it breaks on essentially every run** — its Postgres
+  database is never reset between runs (`docs/architecture/preview-environment.md`) and only ever
+  grows, so any `@preview-smoke`-tagged test hits this immediately, not eventually. Use
+  `findProjectLink(page, name)` from `e2e/project-flows.ts` (reads the table's caption and navigates
+  to the correct page) instead of a bare `getByRole('link', { name })` for any test that could run
+  against a non-reset database — which today means anything tagged `@preview-smoke`.
 
 ## 3. Plan before editing
 
