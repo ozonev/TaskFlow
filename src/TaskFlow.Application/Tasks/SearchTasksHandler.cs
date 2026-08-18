@@ -1,8 +1,9 @@
 using TaskFlow.Application.Abstractions;
+using TaskFlow.Application.Labels;
 
 namespace TaskFlow.Application.Tasks;
 
-public sealed class SearchTasksHandler(ITaskRepository repository)
+public sealed class SearchTasksHandler(ITaskRepository repository, ITaskLabelRepository taskLabelRepository)
 {
     public async Task<SearchTasksResult> HandleAsync(SearchTasksQuery query, CancellationToken cancellationToken)
     {
@@ -20,6 +21,8 @@ public sealed class SearchTasksHandler(ITaskRepository repository)
         else
         {
             var tasks = await repository.SearchAsync(query.Filter, (int)skip, query.PageSize, cancellationToken);
+            var labelsByTaskId = await taskLabelRepository.GetForTasksAsync(
+                tasks.Select(task => task.Id).ToArray(), cancellationToken);
             items = tasks
                 .Select(task => new TaskDto(
                     task.Id,
@@ -28,7 +31,8 @@ public sealed class SearchTasksHandler(ITaskRepository repository)
                     task.Description,
                     task.Status,
                     task.DueDate,
-                    task.CreatedAtUtc))
+                    task.CreatedAtUtc,
+                    labelsByTaskId[task.Id].Select(LabelDto.FromDomain).ToArray()))
                 .ToArray();
         }
 

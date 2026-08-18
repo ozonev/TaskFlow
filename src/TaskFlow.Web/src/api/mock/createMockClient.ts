@@ -4,8 +4,10 @@ import {
   type AuditLogResponse,
   type CommentResponse,
   type CreateCommentBody,
+  type CreateLabelBody,
   type CreateProjectBody,
   type CreateTaskBody,
+  type LabelResponse,
   type ListProjectsQuery,
   type ListProjectTasksQuery,
   type Paged,
@@ -19,7 +21,7 @@ import {
   throwInjectedFailure,
   type MockEndpoint,
 } from './failure'
-import { byCreatedThenId, filterTasks, MockStore, paginate } from './store'
+import { byCreatedThenId, filterTasks, MockStore, paginate, withLabels } from './store'
 import { notFound, optional, pageParams, required, ValidationErrors } from './validate'
 
 export interface MockClientOptions {
@@ -126,7 +128,8 @@ export function createMockClient(options: MockClientOptions = {}): MockClient {
         const matched = store.data.tasks
           .filter((task) => task.projectId === projectId)
           .sort(byCreatedThenId)
-        return paginate(matched, page, pageSize)
+        const paged = paginate(matched, page, pageSize)
+        return { ...paged, items: paged.items.map((task) => withLabels(store, task)) }
       })
     },
 
@@ -143,9 +146,21 @@ export function createMockClient(options: MockClientOptions = {}): MockClient {
         const { page, pageSize } = pageParams(query.page, query.pageSize)
 
         /* No 404 here even for an unknown projectId — the filter simply matches
-           nothing and the response is an empty page. */
-        const matched = filterTasks(store.data.tasks, query).sort(byCreatedThenId)
-        return paginate(matched, page, pageSize)
+           nothing and the response is an empty page. Mirrors TaskRepository.ApplyFilter's
+           LabelId clause: a subquery over the join, applied after the scalar filters. */
+        let matched = filterTasks(store.data.tasks, query)
+        if (query.labelId !== undefined) {
+          const taskIdsWithLabel = new Set(
+            store.data.taskLabels
+              .filter((link) => link.labelId === query.labelId)
+              .map((link) => link.taskId),
+          )
+          matched = matched.filter((task) => taskIdsWithLabel.has(task.id))
+        }
+        matched = matched.sort(byCreatedThenId)
+
+        const paged = paginate(matched, page, pageSize)
+        return { ...paged, items: paged.items.map((task) => withLabels(store, task)) }
       })
     },
 
@@ -170,6 +185,7 @@ export function createMockClient(options: MockClientOptions = {}): MockClient {
           status: 'Todo',
           dueDate: normaliseDueDate(body.dueDate),
           createdAtUtc: store.timestamp(),
+          labels: [],
         }
         store.data.tasks.push(task)
         store.data.auditLogs.push({
@@ -186,7 +202,8 @@ export function createMockClient(options: MockClientOptions = {}): MockClient {
 
     getTask(id: string, options?: RequestOptions) {
       return call('getTask', options, (): TaskResponse => {
-        return store.findTask(id) ?? notFound()
+        const task = store.findTask(id) ?? notFound()
+        return withLabels(store, task)
       })
     },
 
@@ -247,6 +264,82 @@ export function createMockClient(options: MockClientOptions = {}): MockClient {
         return store.data.auditLogs
           .filter((entry) => entry.taskId === taskId)
           .sort(byCreatedThenId)
+      })
+    },
+
+    listLabels(projectId: string, options?: RequestOptions) {
+      return call('listLabels', options, (): LabelResponse[] => {
+        if (!store.findProject(projectId)) {
+          notFound()
+        }
+        return store.data.labels
+          .filter((label) => label.projectId === projectId)
+          .sort(byCreatedThenId)
+      })
+    },
+
+    createLabel(projectId: string, body: CreateLabelBody, options?: RequestOptions) {
+      return call('createLabel', options, (): LabelResponse => {
+        if (!store.findProject(projectId)) {
+          notFound()
+        }
+
+        const errors = new ValidationErrors()
+        const name = required(errors, 'Name', body.name, LIMITS.labelName)
+        if (
+          errors.isEmpty &&
+          store.data.labels.some(
+            (label) => label.projectId === projectId && label.name.toLowerCase() === name.toLowerCase(),
+          )
+        ) {
+          errors.add('Name', `A label named '${name}' already exists in this project.`)
+        }
+        errors.throwIfAny()
+
+        const label: LabelResponse = {
+          id: store.nextId(),
+          projectId,
+          name,
+          createdAtUtc: store.timestamp(),
+        }
+        store.data.labels.push(label)
+        store.data.auditLogs.push({
+          id: store.nextId(),
+          projectId,
+          taskId: null,
+          eventType: 'LabelCreated',
+          description: `Label '${label.name}' created.`,
+          createdAtUtc: label.createdAtUtc,
+        })
+        return label
+      })
+    },
+
+    assignLabel(taskId: string, labelId: string, options?: RequestOptions) {
+      return call('assignLabel', options, (): TaskResponse => {
+        const task = store.findTask(taskId) ?? notFound()
+        const label = store.findLabel(labelId) ?? notFound()
+
+        if (label.projectId !== task.projectId) {
+          const errors = new ValidationErrors()
+          errors.add('LabelId', "Label does not belong to this task's project.")
+          errors.throwIfAny()
+        }
+
+        // Re-assigning an already-assigned label is idempotent, matching AssignTaskLabelHandler.
+        if (!store.findTaskLabel(taskId, labelId)) {
+          store.data.taskLabels.push({ taskId, labelId })
+          store.data.auditLogs.push({
+            id: store.nextId(),
+            projectId: task.projectId,
+            taskId,
+            eventType: 'TaskLabelAssigned',
+            description: `Label '${label.name}' assigned to task '${task.title}'.`,
+            createdAtUtc: store.timestamp(),
+          })
+        }
+
+        return withLabels(store, task)
       })
     },
   }

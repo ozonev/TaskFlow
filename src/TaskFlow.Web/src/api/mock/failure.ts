@@ -24,6 +24,9 @@ export type MockEndpoint =
   | 'listComments'
   | 'createComment'
   | 'listTaskAudit'
+  | 'listLabels'
+  | 'createLabel'
+  | 'assignLabel'
 
 export type FailureMode = '400' | '404' | '500' | 'network'
 

@@ -77,6 +77,7 @@ export function TaskListPage() {
   const unfilteredCount = useUnfilteredTaskCount(projectId, isFilteredEmpty)
 
   const newTaskLink = useOverlayLinkProps(`/projects/${projectId}/tasks/new`)
+  const manageLabelsLink = useOverlayLinkProps(`/projects/${projectId}/labels`)
 
   useShortcut('n', (event) => {
     event.preventDefault()
@@ -97,6 +98,13 @@ export function TaskListPage() {
     </LinkButton>
   )
 
+  const headerActions = (
+    <>
+      <LinkButton {...manageLabelsLink}>Manage labels</LinkButton>
+      {newTaskAction}
+    </>
+  )
+
   if (project.error) {
     return (
       <div className="content-column">
@@ -114,10 +122,10 @@ export function TaskListPage() {
 
   return (
     <div className="content-column">
-      <PageHeader title={project.data?.name ?? 'Project'} action={newTaskAction} />
+      <PageHeader title={project.data?.name ?? 'Project'} action={headerActions} />
 
-      <FilterBar filters={filters} />
-      <ActiveFilterChips filters={filters} />
+      <FilterBar projectId={projectId} filters={filters} />
+      <ActiveFilterChips projectId={projectId} filters={filters} />
 
       {/* §7 — result count in a polite live region. Always mounted so the
           region reliably announces a change in its text rather than appearing

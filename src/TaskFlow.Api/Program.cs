@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Abstractions;
 using TaskFlow.Application.AuditLogs;
 using TaskFlow.Application.Comments;
+using TaskFlow.Application.Labels;
 using TaskFlow.Application.Projects;
 using TaskFlow.Application.Tasks;
 using TaskFlow.Infrastructure;
@@ -63,6 +64,12 @@ builder.Services.AddScoped<CreateTaskHandler>();
 builder.Services.AddScoped<SearchTasksHandler>();
 builder.Services.AddScoped<GetTaskByIdHandler>();
 builder.Services.AddScoped<ListProjectTasksHandler>();
+builder.Services.AddScoped<AssignTaskLabelHandler>();
+
+builder.Services.AddScoped<ILabelRepository, LabelRepository>();
+builder.Services.AddScoped<ITaskLabelRepository, TaskLabelRepository>();
+builder.Services.AddScoped<CreateLabelHandler>();
+builder.Services.AddScoped<ListLabelsHandler>();
 
 builder.Services.AddScoped<ICommentRepository, CommentRepository>();
 builder.Services.AddScoped<CreateCommentHandler>();

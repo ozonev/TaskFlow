@@ -17,7 +17,7 @@ import type { TaskFiltersState } from './useTaskFilters'
  */
 export function useTaskSearch(
   projectId: string,
-  filters: Pick<TaskFiltersState, 'q' | 'status' | 'dueFrom' | 'dueTo' | 'page'>,
+  filters: Pick<TaskFiltersState, 'q' | 'status' | 'dueFrom' | 'dueTo' | 'labelId' | 'page'>,
 ): QueryResult<Paged<TaskResponse>> {
   const client = useTaskFlowClient()
 
@@ -29,6 +29,7 @@ export function useTaskSearch(
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.dueFrom ? { dueDateFrom: toDueDateFromInstant(filters.dueFrom) } : {}),
     ...(filters.dueTo ? { dueDateTo: toDueDateToInstant(filters.dueTo) } : {}),
+    ...(filters.labelId ? { labelId: filters.labelId } : {}),
   }
 
   return useQuery({

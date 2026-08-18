@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Domain.AuditLogs;
+using TaskFlow.Domain.Labels;
 using TaskFlow.Domain.Projects;
 using TaskFlow.Domain.TaskComments;
 using TaskFlow.Domain.TaskItems;
@@ -15,6 +16,10 @@ public class TaskFlowDbContext(DbContextOptions<TaskFlowDbContext> options) : Db
     public DbSet<TaskComment> Comments => Set<TaskComment>();
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    public DbSet<Label> Labels => Set<Label>();
+
+    public DbSet<TaskLabel> TaskLabels => Set<TaskLabel>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -4,10 +4,14 @@ import { useLocation, useParams } from 'react-router'
 import { Dialog } from '../../a11y/Dialog'
 import { useDialogClose } from '../../a11y/useDialogClose'
 import { isApiError } from '../../api/problem'
+import type { LabelResponse } from '../../api/types'
 import { ActivityPanel } from '../activity/ActivityPanel'
 import { CommentPanel } from '../comments/CommentPanel'
+import { useAssignLabel } from '../labels/useAssignLabel'
+import { useLabels } from '../labels/useLabels'
 import { formatDate, formatDateTime } from '../../lib/datetime'
 import { Button } from '../../ui/Button'
+import { Select } from '../../ui/Select'
 import { SkeletonBlocks } from '../../ui/SkeletonBlocks'
 import { StateBlock } from '../../ui/StateBlock'
 import { Tag } from '../../ui/Tag'
@@ -71,6 +75,8 @@ export function TaskDrawer() {
           </div>
           {task.data.description && <p className={`${styles.description} type-body`}>{task.data.description}</p>}
 
+          <TaskLabelsSection projectId={task.data.projectId} taskId={taskId} labels={task.data.labels} />
+
           <div role="tablist" aria-label="Task detail" className={styles.tablist}>
             <button
               type="button"
@@ -115,5 +121,59 @@ export function TaskDrawer() {
         </>
       )}
     </Dialog>
+  )
+}
+
+/**
+ * Current labels as Tags, plus a Select of the project's not-yet-assigned labels
+ * that assigns on selection — no separate "Add" button, since the Select itself
+ * is the whole interaction. Resets to the placeholder after each assignment so
+ * the same control can add another label right away.
+ */
+function TaskLabelsSection({
+  projectId,
+  taskId,
+  labels,
+}: {
+  projectId: string
+  taskId: string
+  labels: LabelResponse[]
+}) {
+  const projectLabels = useLabels(projectId)
+  const assignLabel = useAssignLabel(taskId)
+
+  const assignedIds = new Set(labels.map((label) => label.id))
+  const availableLabels = (projectLabels.data ?? []).filter((label) => !assignedIds.has(label.id))
+
+  return (
+    <div className={styles.meta}>
+      {labels.map((label) => (
+        <Tag key={label.id}>{label.name}</Tag>
+      ))}
+      {availableLabels.length > 0 && (
+        <Select
+          id="task-add-label"
+          label="Add a label"
+          value=""
+          onChange={(value) => {
+            if (value) {
+              void assignLabel.run(value)
+            }
+          }}
+          options={[
+            { value: '', label: 'Add a label…' },
+            ...availableLabels.map((label) => ({ value: label.id, label: label.name })),
+          ]}
+        />
+      )}
+      {assignLabel.error !== undefined && (
+        <p role="alert" className="type-meta">
+          Couldn't add that label.
+          {isApiError(assignLabel.error) && assignLabel.error.problem.traceId && (
+            <> Reference: <span className="type-identifier">{assignLabel.error.problem.traceId}</span></>
+          )}
+        </p>
+      )}
+    </div>
   )
 }

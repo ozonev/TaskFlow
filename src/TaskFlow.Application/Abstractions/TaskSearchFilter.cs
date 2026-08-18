@@ -7,4 +7,5 @@ public sealed record TaskSearchFilter(
     TaskItemStatus? Status,
     DateTime? DueDateFrom,
     DateTime? DueDateTo,
-    string? Title);
+    string? Title,
+    Guid? LabelId = null);

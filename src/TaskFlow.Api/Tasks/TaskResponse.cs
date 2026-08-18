@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using TaskFlow.Api.Labels;
 using TaskFlow.Application.Tasks;
 using TaskFlow.Domain.TaskItems;
 
@@ -11,7 +12,8 @@ public sealed record TaskResponse(
     string? Description,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] TaskItemStatus Status,
     DateTime? DueDate,
-    DateTime CreatedAtUtc)
+    DateTime CreatedAtUtc,
+    LabelResponse[] Labels)
 {
     public static TaskResponse FromDto(TaskDto task) => new(
         task.Id,
@@ -20,5 +22,6 @@ public sealed record TaskResponse(
         task.Description,
         task.Status,
         task.DueDate,
-        task.CreatedAtUtc);
+        task.CreatedAtUtc,
+        task.Labels.Select(LabelResponse.FromDto).ToArray());
 }

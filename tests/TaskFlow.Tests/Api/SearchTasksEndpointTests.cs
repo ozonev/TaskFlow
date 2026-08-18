@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using TaskFlow.Domain.Labels;
 using TaskFlow.Domain.Projects;
 using TaskFlow.Domain.TaskItems;
 using TaskFlow.Infrastructure;
@@ -26,6 +27,8 @@ public sealed class SearchTasksEndpointTests(TaskFlowApiFactory factory) : IAsyn
         using var scope = factory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>();
         await context.AuditLogs.ExecuteDeleteAsync(Ct);
+        await context.TaskLabels.ExecuteDeleteAsync(Ct);
+        await context.Labels.ExecuteDeleteAsync(Ct);
         await context.Tasks.ExecuteDeleteAsync(Ct);
         await context.Projects.ExecuteDeleteAsync(Ct);
     }
@@ -70,6 +73,24 @@ public sealed class SearchTasksEndpointTests(TaskFlowApiFactory factory) : IAsyn
         }
 
         return task;
+    }
+
+    private async Task<Guid> SeedLabelAsync(Guid projectId, string name)
+    {
+        using var scope = factory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>();
+        var label = Label.Create(projectId, name);
+        context.Labels.Add(label);
+        await context.SaveChangesAsync(Ct);
+        return label.Id;
+    }
+
+    private async Task AssignLabelAsync(Guid taskId, Guid labelId)
+    {
+        using var scope = factory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>();
+        context.TaskLabels.Add(TaskLabel.Create(taskId, labelId));
+        await context.SaveChangesAsync(Ct);
     }
 
     private async Task<TaskSearchResponseModel> SearchAsync(string query = "")
@@ -168,6 +189,37 @@ public sealed class SearchTasksEndpointTests(TaskFlowApiFactory factory) : IAsyn
     }
 
     [Fact]
+    public async Task Search_FiltersByLabel_LabelOnly()
+    {
+        var projectId = await SeedProjectAsync();
+        var labelId = await SeedLabelAsync(projectId, "Urgent");
+        var labeled = await SeedTaskAsync(projectId, "Labeled");
+        await SeedTaskAsync(projectId, "Unlabeled");
+        await AssignLabelAsync(labeled.Id, labelId);
+
+        var result = await SearchAsync($"?labelId={labelId}");
+
+        var task = Assert.Single(result.Items);
+        Assert.Equal("Labeled", task.Title);
+        var label = Assert.Single(task.Labels);
+        Assert.Equal(labelId, label.Id);
+    }
+
+    [Fact]
+    public async Task Search_FiltersByStatusAndLabel_Combined()
+    {
+        var projectId = await SeedProjectAsync();
+        var labelId = await SeedLabelAsync(projectId, "Urgent");
+        var matching = await SeedTaskAsync(projectId, "Matches both");
+        await AssignLabelAsync(matching.Id, labelId);
+
+        var result = await SearchAsync($"?status=Todo&labelId={labelId}");
+
+        var task = Assert.Single(result.Items);
+        Assert.Equal("Matches both", task.Title);
+    }
+
+    [Fact]
     public async Task Search_CombinesMultipleFilters()
     {
         var projectA = await SeedProjectAsync();
@@ -240,7 +292,12 @@ public sealed class SearchTasksEndpointTests(TaskFlowApiFactory factory) : IAsyn
         var result = await SearchAsync();
 
         var fetched = Assert.Single(result.Items);
-        Assert.Equal(posted, fetched);
+        // Not Assert.Equal(posted, fetched): TaskResponseModel's synthesized equality compares
+        // Labels by array reference, not content, so two independently-deserialized empty arrays
+        // would never compare equal.
+        Assert.Equal(posted.Id, fetched.Id);
+        Assert.Equal(posted.Title, fetched.Title);
+        Assert.Empty(fetched.Labels);
     }
 
     [Fact]
@@ -302,5 +359,8 @@ public sealed class SearchTasksEndpointTests(TaskFlowApiFactory factory) : IAsyn
         string? Description,
         string Status,
         DateTime? DueDate,
-        DateTime CreatedAtUtc);
+        DateTime CreatedAtUtc,
+        LabelResponseModel[] Labels);
+
+    private sealed record LabelResponseModel(Guid Id, Guid ProjectId, string Name, DateTime CreatedAtUtc);
 }

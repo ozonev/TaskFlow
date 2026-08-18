@@ -11,6 +11,8 @@ export interface TaskFiltersState {
   status: 'Todo' | ''
   dueFrom: string
   dueTo: string
+  /** Single label id, or '' for "any label" — the filter is single-select. */
+  labelId: string
   page: number
   hasActiveFilters: boolean
 }
@@ -22,6 +24,7 @@ export interface TaskFiltersApi extends TaskFiltersState {
   setStatus: (value: 'Todo' | '') => void
   setDueFrom: (value: string) => void
   setDueTo: (value: string) => void
+  setLabelId: (value: string) => void
   setPage: (page: number) => void
   clearAll: () => void
 }
@@ -37,9 +40,10 @@ export function useTaskFilters(): TaskFiltersApi {
   const status = (searchParams.get('status') as 'Todo' | '' | null) ?? ''
   const dueFrom = searchParams.get('dueFrom') ?? ''
   const dueTo = searchParams.get('dueTo') ?? ''
+  const labelId = searchParams.get('label') ?? ''
   const rawPage = Number(searchParams.get('page'))
   const page = Number.isInteger(rawPage) && rawPage >= 1 ? rawPage : 1
-  const hasActiveFilters = q !== '' || status !== '' || dueFrom !== '' || dueTo !== ''
+  const hasActiveFilters = q !== '' || status !== '' || dueFrom !== '' || dueTo !== '' || labelId !== ''
 
   /* §6 line 116 — search debounces 300ms and REPLACES history while typing (so
      back doesn't step through keystrokes); §6 line 117 — every other filter
@@ -123,6 +127,7 @@ export function useTaskFilters(): TaskFiltersApi {
   const setStatus = useCallback((value: 'Todo' | '') => applyPatch({ status: value }), [applyPatch])
   const setDueFrom = useCallback((value: string) => applyPatch({ dueFrom: value }), [applyPatch])
   const setDueTo = useCallback((value: string) => applyPatch({ dueTo: value }), [applyPatch])
+  const setLabelId = useCallback((value: string) => applyPatch({ label: value }), [applyPatch])
 
   const setPage = useCallback(
     (nextPage: number) => {
@@ -137,7 +142,7 @@ export function useTaskFilters(): TaskFiltersApi {
     }
     lastWrittenRef.current = ''
     setSearchDraft('')
-    applyPatch({ q: null, status: null, dueFrom: null, dueTo: null })
+    applyPatch({ q: null, status: null, dueFrom: null, dueTo: null, label: null })
   }, [applyPatch])
 
   return {
@@ -146,6 +151,7 @@ export function useTaskFilters(): TaskFiltersApi {
     status,
     dueFrom,
     dueTo,
+    labelId,
     page,
     hasActiveFilters,
     onSearchChange,
@@ -153,6 +159,7 @@ export function useTaskFilters(): TaskFiltersApi {
     setStatus,
     setDueFrom,
     setDueTo,
+    setLabelId,
     setPage,
     clearAll,
   }

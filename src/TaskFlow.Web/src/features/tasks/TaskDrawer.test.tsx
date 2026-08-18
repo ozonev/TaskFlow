@@ -6,9 +6,12 @@ import { renderApp } from '../../test/renderApp'
 
 const REDESIGN_ID = '00009701-0000-4000-8000-000000000001'
 // "Fix colour contrast failures…" — has 2 comments and a TaskCreated audit row.
+// Also the only seeded task carrying both of the redesign project's labels
+// (Design and Urgent), so it has no available label left to add.
 const TASK_WITH_COMMENTS = '00007a5c-0000-4000-8000-000000000002'
 // "Investigate font loading strategy" — no comments, and seeded with
-// audited:false, so it has no activity rows either.
+// audited:false, so it has no activity rows either. Also carries no labels,
+// so both of the project's labels are available to add.
 const TASK_WITH_NEITHER = '00007a5c-0000-4000-8000-00000000000c'
 
 describe('TaskDrawer', () => {
@@ -63,6 +66,30 @@ describe('TaskDrawer', () => {
     await user.click(activityTab)
     expect(activityTab).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByText('Task created')).toBeInTheDocument()
+  })
+
+  describe('labels', () => {
+    it('shows already-assigned labels and excludes them from the Add-a-label options', async () => {
+      renderApp(`/projects/${REDESIGN_ID}/tasks/${TASK_WITH_COMMENTS}`)
+      const dialog = await screen.findByRole('dialog', { name: /Fix colour contrast/ })
+
+      expect(await within(dialog).findByText('Design')).toBeInTheDocument()
+      expect(within(dialog).getByText('Urgent')).toBeInTheDocument()
+      // Both of the project's labels are already on this task, so there is
+      // nothing left to offer — the control itself should not render.
+      expect(within(dialog).queryByRole('combobox', { name: 'Add a label' })).not.toBeInTheDocument()
+    })
+
+    it('assigning a label from the drawer shows it as a chip', async () => {
+      const user = userEvent.setup()
+      renderApp(`/projects/${REDESIGN_ID}/tasks/${TASK_WITH_NEITHER}`)
+      const dialog = await screen.findByRole('dialog', { name: /Investigate font loading/ })
+
+      const addLabel = within(dialog).getByRole('combobox', { name: 'Add a label' })
+      await user.selectOptions(addLabel, 'Design')
+
+      expect(await within(dialog).findByText('Design')).toBeInTheDocument()
+    })
   })
 
   it("a comments-panel failure degrades only that panel — activity is unaffected", async () => {

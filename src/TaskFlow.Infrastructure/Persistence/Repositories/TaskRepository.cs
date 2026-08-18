@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Application.Abstractions;
+using TaskFlow.Domain.Labels;
 using TaskFlow.Domain.TaskItems;
 
 namespace TaskFlow.Infrastructure.Persistence.Repositories;
@@ -39,7 +40,7 @@ public sealed class TaskRepository(TaskFlowDbContext context) : ITaskRepository
     /// case-insensitive identically on SQLite (case-insensitive LIKE by default) and Postgres
     /// (case-sensitive LIKE by default) instead of behaving differently per provider.
     /// </summary>
-    private static IQueryable<TaskItem> ApplyFilter(IQueryable<TaskItem> query, TaskSearchFilter filter)
+    private IQueryable<TaskItem> ApplyFilter(IQueryable<TaskItem> query, TaskSearchFilter filter)
     {
         if (filter.ProjectId is { } projectId)
         {
@@ -67,6 +68,11 @@ public sealed class TaskRepository(TaskFlowDbContext context) : ITaskRepository
         {
             var loweredTitle = filter.Title.ToLower();
             query = query.Where(task => task.Title.ToLower().Contains(loweredTitle));
+        }
+
+        if (filter.LabelId is { } labelId)
+        {
+            query = query.Where(task => context.TaskLabels.Any(tl => tl.TaskId == task.Id && tl.LabelId == labelId));
         }
 
         return query;

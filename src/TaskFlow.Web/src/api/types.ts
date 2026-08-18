@@ -13,13 +13,25 @@
 /** The status enum has exactly one member today. A board has nothing to move. */
 export type TaskItemStatus = 'Todo'
 
-export type AuditEventType = 'ProjectCreated' | 'TaskCreated' | 'TaskCommentAdded'
+export type AuditEventType =
+  | 'ProjectCreated'
+  | 'TaskCreated'
+  | 'TaskCommentAdded'
+  | 'LabelCreated'
+  | 'TaskLabelAssigned'
 
 export interface ProjectResponse {
   id: string
   name: string
   description: string | null
   /** ISO-8601, always UTC with a Z suffix. Fractional digits vary — parse, don't compare. */
+  createdAtUtc: string
+}
+
+export interface LabelResponse {
+  id: string
+  projectId: string
+  name: string
   createdAtUtc: string
 }
 
@@ -31,6 +43,7 @@ export interface TaskResponse {
   status: TaskItemStatus
   dueDate: string | null
   createdAtUtc: string
+  labels: LabelResponse[]
 }
 
 export interface CommentResponse {
@@ -78,6 +91,8 @@ export interface TaskSearchQuery {
   dueDateFrom?: string
   /** Compared as an instant, inclusive. See toDueDateTo() in lib/datetime.ts. */
   dueDateTo?: string
+  /** Single label id — the filter is single-select, matching the FilterBar control. */
+  labelId?: string
   page?: number
   pageSize?: number
 }
@@ -98,6 +113,10 @@ export interface CreateCommentBody {
   text: string
 }
 
+export interface CreateLabelBody {
+  name: string
+}
+
 /** Field length limits, from the Domain layer's constants. */
 export const LIMITS = {
   projectName: 100,
@@ -106,4 +125,5 @@ export const LIMITS = {
   taskDescription: 2000,
   commentAuthorName: 100,
   commentText: 2000,
+  labelName: 50,
 } as const

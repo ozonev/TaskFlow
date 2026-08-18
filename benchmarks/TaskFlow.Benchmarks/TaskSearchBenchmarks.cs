@@ -32,7 +32,7 @@ public class TaskSearchBenchmarks
         _context.Database.Migrate();
 
         _seededProjectId = BenchmarkSeeder.Seed(_context, projectCount: 30, taskCount: 50_000);
-        _handler = new SearchTasksHandler(new TaskRepository(_context));
+        _handler = new SearchTasksHandler(new TaskRepository(_context), new TaskLabelRepository(_context));
     }
 
     [GlobalCleanup]

@@ -1,4 +1,5 @@
 import { formatDate } from '../../lib/datetime'
+import { useLabels } from '../labels/useLabels'
 import type { TaskFiltersApi } from './useTaskFilters'
 import styles from './ActiveFilterChips.module.css'
 
@@ -9,7 +10,17 @@ interface Chip {
 }
 
 /** §4 — removable summary of applied filters, plus clear-all. */
-export function ActiveFilterChips({ filters }: { filters: TaskFiltersApi }) {
+export function ActiveFilterChips({
+  projectId,
+  filters,
+}: {
+  projectId: string
+  filters: TaskFiltersApi
+}) {
+  // Shares the LabelFilter's cache entry (same query key) — resolving the
+  // selected label's name here costs no extra request on the happy path.
+  const labels = useLabels(projectId)
+
   if (!filters.hasActiveFilters) {
     return null
   }
@@ -33,6 +44,14 @@ export function ActiveFilterChips({ filters }: { filters: TaskFiltersApi }) {
       key: 'dueTo',
       label: `Due to ${formatDate(`${filters.dueTo}T00:00:00.000Z`)}`,
       onRemove: () => filters.setDueTo(''),
+    })
+  }
+  if (filters.labelId) {
+    const labelName = labels.data?.find((label) => label.id === filters.labelId)?.name ?? filters.labelId
+    chips.push({
+      key: 'label',
+      label: `Label: ${labelName}`,
+      onRemove: () => filters.setLabelId(''),
     })
   }
 
