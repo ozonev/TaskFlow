@@ -1,0 +1,117 @@
+name: E2E
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.filter.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            e2e:
+              - 'src/TaskFlow.Api/**'
+              - 'src/TaskFlow.Web/**'
+              - 'src/TaskFlow.Infrastructure/**'
+              - 'tests/TaskFlow.E2ETests/**'
+              - 'global.json'
+              - '.github/workflows/e2e.yml'
+
+  e2e-local:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            src/TaskFlow.Web/package-lock.json
+            tests/TaskFlow.E2ETests/package-lock.json
+
+      # Warms the Playwright browser cache so the E2E package's postinstall
+      # (`playwright install --with-deps chromium`) skips re-downloading
+      # Chromium on every run. Keyed on its lockfile since that's what pins
+      # the @playwright/test version, which in turn determines the browser
+      # build actually needed.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('tests/TaskFlow.E2ETests/package-lock.json') }}
+
+      - name: Install frontend dependencies
+        working-directory: src/TaskFlow.Web
+        run: npm ci
+
+      - name: Install E2E test dependencies
+        working-directory: tests/TaskFlow.E2ETests
+        run: npm ci
+
+      # Debug (no --configuration flag) to match what `dotnet run` inside
+      # playwright.config.ts's webServer entry actually uses — a Release
+      # pre-build here would just be discarded and rebuilt as Debug anyway.
+      - name: Build API
+        run: dotnet build TaskFlow.slnx
+
+      # Boots the isolated API+Web environment via Playwright's own webServer
+      # config (already applies EF migrations against the isolated SQLite
+      # file as a side effect of ASPNETCORE_ENVIRONMENT=Development — no
+      # separate migration step needed). process.env.CI activates the
+      # retries: 2 already configured in playwright.config.ts.
+      - name: Run local E2E suite
+        working-directory: tests/TaskFlow.E2ETests
+        run: npm test
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-local-report
+          path: |
+            tests/TaskFlow.E2ETests/playwright-report/
+            tests/TaskFlow.E2ETests/test-results/
+          retention-days: 7
+
+      # Defensive only — the GitHub-hosted runner VM is destroyed right after
+      # this job regardless, and Playwright's own webServer teardown already
+      # kills the dotnet/vite child processes it spawned.
+      - name: Clean up processes and test data
+        if: always()
+        run: |
+          pkill -f 'dotnet.*TaskFlow.Api' 2>/dev/null || true
+          pkill -f 'vite' 2>/dev/null || true
+          rm -f tests/TaskFlow.E2ETests/.tmp/*.db*
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "### E2E (local)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Result: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Target: local (Playwright-managed API + Web dev server, isolated SQLite)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ job.status }}" != "success" ]; then
+            echo "- See the **e2e-local-report** artifact for trace/screenshot/video evidence." >> "$GITHUB_STEP_SUMMARY"
+          fi
