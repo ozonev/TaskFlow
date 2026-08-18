@@ -7,6 +7,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..', '..')
 const dbPath = path.join(__dirname, '.tmp', 'e2e.db')
 
+// Explicit (not just relying on Playwright's default) so a startup crash's
+// stack trace always reaches the terminal/CI log — confirmed via a deliberate
+// bad-connection-string exercise that this is the only durable record of such
+// a failure; Playwright attaches no trace/screenshot for a webServer that
+// never started. Shared across both entries so a third one can't forget it.
+const webServerLogging = { stdout: 'pipe', stderr: 'pipe' } as const
+
 // Cleanup must run exactly once, before the API webServer starts — NOT in
 // globalSetup, which Playwright runs AFTER webServer is already up (lifecycle
 // is runnerSetup -> webServer -> globalSetup -> tests -> globalTeardown ->
@@ -16,7 +23,20 @@ const dbPath = path.join(__dirname, '.tmp', 'e2e.db')
 if (process.env.TEST_WORKER_INDEX === undefined) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true })
   for (const suffix of ['', '-shm', '-wal', '-journal']) {
-    fs.rmSync(dbPath + suffix, { force: true })
+    try {
+      fs.rmSync(dbPath + suffix, { force: true })
+    } catch (error) {
+      // On Windows, force:true still throws EBUSY/EPERM on a file a stray
+      // process still has open (e.g. a dotnet run left over from a killed
+      // or timed-out previous run) — surface that plainly instead of a bare
+      // ENOENT-shaped stack trace, since `force` only swallows "not found".
+      throw new Error(
+        `Could not remove ${dbPath + suffix} before starting the E2E run. ` +
+          'It is likely still held open by a leftover process (check for a ' +
+          "stray 'dotnet run --project src/TaskFlow.Api' on port 5274 and stop it). " +
+          `Original error: ${error}`,
+      )
+    }
   }
 }
 
@@ -44,13 +64,7 @@ export default defineConfig({
       url: 'http://localhost:5274/health',
       reuseExistingServer: false,
       timeout: 120_000,
-      // Explicit (not just relying on Playwright's default) so a startup
-      // crash's stack trace always reaches the terminal/CI log — confirmed
-      // via a deliberate bad-connection-string exercise that this is the
-      // only durable record of such a failure; Playwright attaches no
-      // trace/screenshot for a webServer that never started.
-      stdout: 'pipe',
-      stderr: 'pipe',
+      ...webServerLogging,
       env: {
         ASPNETCORE_ENVIRONMENT: 'Development',
         ConnectionStrings__DefaultConnection: `Data Source=${dbPath}`,
@@ -62,8 +76,7 @@ export default defineConfig({
       url: 'http://localhost:5273',
       reuseExistingServer: false,
       timeout: 60_000,
-      stdout: 'pipe',
-      stderr: 'pipe',
+      ...webServerLogging,
     },
   ],
 })

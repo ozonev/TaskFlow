@@ -17,6 +17,10 @@ test('creating a project persists across reload', async ({ page }) => {
 
   await expect(page.getByRole('status').filter({ hasText: `"${uniqueName}" created` })).toBeVisible()
   await expect(dialog).not.toBeVisible()
+  // Assumes this project lands on page 1 (list is ordered ascending by
+  // CreatedAtUtc, DEFAULT_PAGE_SIZE=20) — holds as long as the run's total
+  // project count stays under 20. See add-e2e-test SKILL.md step 2 before
+  // adding a spec that could push the cumulative total past that.
   await expect(page.getByRole('link', { name: uniqueName })).toBeVisible()
 
   // Reload proves SQLite-backed persistence, not React/query-cache state:
