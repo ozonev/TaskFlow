@@ -15,11 +15,13 @@ A safeguard that scans a command string for the substring `prod` is not a safegu
 `infra/preview/platform/providers.tf` and `infra/preview/application/providers.tf` both set:
 ```hcl
 provider "azurerm" {
-  subscription_id = "ad925f8c-465f-45b4-9632-f6286e0f30e4"
-  tenant_id       = "a0c01160-86c9-4406-8a44-392e8b9c6d9b"
+  subscription_id = "<subscription-id>"
+  tenant_id       = "<tenant-id>"
   features {}
 }
 ```
+(Redacted here since this is a public repo, matching `preview-environment.md`'s convention — the actual `providers.tf` files necessarily contain the real values, since a placeholder there would defeat the whole point of the pin; see the redaction note in `preview-environment.md` for why that trade-off doesn't apply to source that has to actually run.)
+
 These are **literals, not variables with a default**. A Terraform input variable can always be overridden via `-var`/`-var-file` regardless of any `validation` block — a default only changes what happens when nobody overrides it. A literal has no override mechanism at all. This means: no `terraform` command run against either root can ever call a different subscription or tenant, full stop — not "will be flagged," structurally cannot happen. If the active credential doesn't have access to that exact subscription/tenant, authentication fails immediately and loudly, which is the correct failure mode.
 
 ### 2. Static, path-based permission denies
