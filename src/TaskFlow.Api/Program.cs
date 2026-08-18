@@ -112,7 +112,9 @@ app.MapHealthChecks("/health");
 
 app.MapControllers();
 
-app.MapFallbackToFile("index.html");
+// Regex-excludes "api" so an unmatched/typo'd API route 404s instead of falling through to the
+// SPA shell with a 200 -- MapControllers() above already claims every real API route first.
+app.MapFallbackToFile("{*path:regex(^(?!api).*$)}", "index.html");
 
 app.Run();
 
