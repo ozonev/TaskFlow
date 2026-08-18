@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
+namespace TaskFlow.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddLabels : Migration
@@ -15,10 +15,11 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                 name: "Labels",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    ProjectId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ProjectId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    NameNormalized = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -35,9 +36,9 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                 name: "TaskLabels",
                 columns: table => new
                 {
-                    TaskId = table.Column<Guid>(type: "uuid", nullable: false),
-                    LabelId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    TaskId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    LabelId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -57,9 +58,9 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Labels_ProjectId_Name",
+                name: "IX_Labels_ProjectId_NameNormalized",
                 table: "Labels",
-                columns: new[] { "ProjectId", "Name" },
+                columns: new[] { "ProjectId", "NameNormalized" },
                 unique: true);
 
             migrationBuilder.CreateIndex(

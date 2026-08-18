@@ -73,4 +73,33 @@ public sealed class ConcurrentDuplicateLabelNameTests(TaskFlowPostgresApiFactory
             .Labels.CountAsync(l => l.ProjectId == projectId, Ct);
         Assert.Equal(1, persistedCount);
     }
+
+    /// <summary>
+    /// A plain unique index on Name would be exact-case — strictly weaker than ExistsByNameAsync's
+    /// case-insensitive pre-check — so two concurrent creates differing only in case would both
+    /// pass the pre-check AND both satisfy an exact-case index, silently producing two "duplicate"
+    /// labels. Varying the casing across every request here (rather than the identical string the
+    /// other test above uses) is what actually exercises LabelConfiguration's NameNormalized shadow
+    /// column/index, not just the exact-case case the naive fix would have covered too.
+    /// </summary>
+    [Fact]
+    public async Task ConcurrentPostsWithDifferentlyCasedSameName_ExactlyOneSucceeds_RestAre400NotError()
+    {
+        var projectId = await SeedProjectAsync();
+        var url = $"/api/projects/{projectId}/labels";
+        var casings = new[] { "Urgent", "urgent", "URGENT", "uRgEnT" };
+
+        var responses = await Task.WhenAll(
+            Enumerable.Range(0, ConcurrentRequestCount)
+                .Select(i => _client.PostAsJsonAsync(url, new { name = casings[i % casings.Length] }, Ct)));
+
+        Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.Created));
+        Assert.Equal(ConcurrentRequestCount - 1, responses.Count(r => r.StatusCode == HttpStatusCode.BadRequest));
+        Assert.DoesNotContain(responses, r => (int)r.StatusCode >= 500);
+
+        using var scope = factory.CreateScope();
+        var persistedCount = await scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>()
+            .Labels.CountAsync(l => l.ProjectId == projectId, Ct);
+        Assert.Equal(1, persistedCount);
+    }
 }

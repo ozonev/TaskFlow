@@ -27,4 +27,35 @@ public class TaskFlowDbContext(DbContextOptions<TaskFlowDbContext> options) : Db
 
         base.OnModelCreating(modelBuilder);
     }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        SyncLabelNormalizedNames();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        SyncLabelNormalizedNames();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Centralized here, not in LabelRepository.AddAsync, so the case-insensitive uniqueness
+    /// backstop (see LabelConfiguration's NameNormalized shadow property) holds for every code path
+    /// that adds or renames a Label — including tests that seed one directly via context.Labels.Add
+    /// — rather than only the one call site that happens to remember to set it.
+    /// </summary>
+    private void SyncLabelNormalizedNames()
+    {
+        foreach (var entry in ChangeTracker.Entries<Label>())
+        {
+            if (entry.State is EntityState.Added or EntityState.Modified)
+            {
+                entry.Property("NameNormalized").CurrentValue = entry.Entity.Name.ToLower();
+            }
+        }
+    }
 }

@@ -61,12 +61,17 @@ namespace TaskFlow.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectId", "Name")
+                    b.HasIndex("ProjectId", "NameNormalized")
                         .IsUnique();
 
                     b.ToTable("Labels", (string)null);

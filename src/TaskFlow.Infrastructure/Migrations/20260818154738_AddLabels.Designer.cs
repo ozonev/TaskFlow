@@ -11,7 +11,7 @@ using TaskFlow.Infrastructure;
 namespace TaskFlow.Infrastructure.Migrations
 {
     [DbContext(typeof(TaskFlowDbContext))]
-    [Migration("20260818131714_AddLabels")]
+    [Migration("20260818154738_AddLabels")]
     partial class AddLabels
     {
         /// <inheritdoc />
@@ -64,12 +64,17 @@ namespace TaskFlow.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectId", "Name")
+                    b.HasIndex("ProjectId", "NameNormalized")
                         .IsUnique();
 
                     b.ToTable("Labels", (string)null);

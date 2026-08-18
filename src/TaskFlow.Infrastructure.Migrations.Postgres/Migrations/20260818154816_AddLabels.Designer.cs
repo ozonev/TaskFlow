@@ -12,7 +12,7 @@ using TaskFlow.Infrastructure;
 namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
 {
     [DbContext(typeof(TaskFlowDbContext))]
-    [Migration("20260818131733_AddLabels")]
+    [Migration("20260818154816_AddLabels")]
     partial class AddLabels
     {
         /// <inheritdoc />
@@ -69,12 +69,17 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectId", "Name")
+                    b.HasIndex("ProjectId", "NameNormalized")
                         .IsUnique();
 
                     b.ToTable("Labels", (string)null);

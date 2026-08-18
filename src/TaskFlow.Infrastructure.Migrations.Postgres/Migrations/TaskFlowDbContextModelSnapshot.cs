@@ -66,12 +66,17 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectId", "Name")
+                    b.HasIndex("ProjectId", "NameNormalized")
                         .IsUnique();
 
                     b.ToTable("Labels", (string)null);
