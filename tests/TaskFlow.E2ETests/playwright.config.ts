@@ -1,0 +1,57 @@
+import { defineConfig, devices } from '@playwright/test'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.resolve(__dirname, '..', '..')
+const dbPath = path.join(__dirname, '.tmp', 'e2e.db')
+
+// Cleanup must run exactly once, before the API webServer starts — NOT in
+// globalSetup, which Playwright runs AFTER webServer is already up (lifecycle
+// is runnerSetup -> webServer -> globalSetup -> tests -> globalTeardown ->
+// runnerTeardown). This config file is re-imported in every worker process,
+// so guard on TEST_WORKER_INDEX (unset only in the main process) to avoid
+// deleting the live DB out from under a running worker.
+if (process.env.TEST_WORKER_INDEX === undefined) {
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true })
+  for (const suffix of ['', '-shm', '-wal', '-journal']) {
+    fs.rmSync(dbPath + suffix, { force: true })
+  }
+}
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
+  use: {
+    baseURL: 'http://localhost:5273',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  webServer: [
+    {
+      // CORS (appsettings.Development.json) is hardcoded to
+      // http://localhost:5273 — if either port changes, update both together.
+      command:
+        'dotnet run --project src/TaskFlow.Api --no-launch-profile --urls http://localhost:5274',
+      cwd: repoRoot,
+      url: 'http://localhost:5274/health',
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: {
+        ASPNETCORE_ENVIRONMENT: 'Development',
+        ConnectionStrings__DefaultConnection: `Data Source=${dbPath}`,
+      },
+    },
+    {
+      command: 'npm run dev',
+      cwd: path.join(repoRoot, 'src', 'TaskFlow.Web'),
+      url: 'http://localhost:5273',
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+  ],
+})
