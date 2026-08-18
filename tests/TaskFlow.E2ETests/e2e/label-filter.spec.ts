@@ -38,7 +38,10 @@ test(
     await page.getByRole('link', { name: taskTitle }).click()
     const taskDrawer = page.getByRole('dialog', { name: taskTitle })
     await taskDrawer.getByRole('combobox', { name: 'Add a label' }).selectOption({ label: labelName })
-    await expect(taskDrawer.getByText(labelName)).toBeVisible()
+    // exact: true, not a bare substring match — the (always-mounted, independently of which tab
+    // is active) Activity panel renders an audit-log entry whose description text also CONTAINS
+    // the label name ("Label 'X' assigned to task 'Y'."), which a substring match would also hit.
+    await expect(taskDrawer.getByText(labelName, { exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(taskDrawer).not.toBeVisible()
 
