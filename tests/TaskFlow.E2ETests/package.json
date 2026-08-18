@@ -6,6 +6,7 @@
   "description": "Playwright E2E tests driving the real TaskFlow API + Web dev servers over HTTP against an isolated SQLite database.",
   "engines": { "node": ">=20" },
   "scripts": {
+    "postinstall": "playwright install chromium",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "report": "playwright show-report"

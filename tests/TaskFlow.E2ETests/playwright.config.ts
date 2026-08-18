@@ -23,6 +23,9 @@ if (process.env.TEST_WORKER_INDEX === undefined) {
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  // Not yet exercised by any CI job — a retry that fails identically is
+  // evidence against timing, a retry that passes is evidence for it.
+  retries: process.env.CI ? 2 : 0,
   reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
   use: {
     baseURL: 'http://localhost:5273',
@@ -41,6 +44,13 @@ export default defineConfig({
       url: 'http://localhost:5274/health',
       reuseExistingServer: false,
       timeout: 120_000,
+      // Explicit (not just relying on Playwright's default) so a startup
+      // crash's stack trace always reaches the terminal/CI log — confirmed
+      // via a deliberate bad-connection-string exercise that this is the
+      // only durable record of such a failure; Playwright attaches no
+      // trace/screenshot for a webServer that never started.
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: {
         ASPNETCORE_ENVIRONMENT: 'Development',
         ConnectionStrings__DefaultConnection: `Data Source=${dbPath}`,
@@ -52,6 +62,8 @@ export default defineConfig({
       url: 'http://localhost:5273',
       reuseExistingServer: false,
       timeout: 60_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
   ],
 })
