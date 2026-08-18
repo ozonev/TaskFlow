@@ -7,6 +7,7 @@ import { CreateProjectDialog } from './features/projects/CreateProjectDialog'
 import { TaskListPage } from './features/tasks/TaskListPage'
 import { CreateTaskDialog } from './features/tasks/CreateTaskDialog'
 import { TaskDrawer } from './features/tasks/TaskDrawer'
+import { ManageLabelsDialog } from './features/labels/ManageLabelsDialog'
 
 /* Exported as a plain route-object array rather than built inline in main.tsx, so
    tests can mount the same tree through createMemoryRouter with an arbitrary
@@ -43,6 +44,7 @@ export const routes: RouteObject[] = [
         children: [
           { path: 'tasks/new', element: <CreateTaskDialog /> },
           { path: 'tasks/:taskId', element: <TaskDrawer /> },
+          { path: 'labels', element: <ManageLabelsDialog /> },
         ],
       },
 

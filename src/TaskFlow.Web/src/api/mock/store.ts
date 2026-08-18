@@ -1,6 +1,6 @@
-import type { Paged, TaskResponse, TaskSearchQuery } from '../types'
+import type { LabelResponse, Paged, TaskResponse, TaskSearchQuery } from '../types'
 import { createIdFactory } from './ids'
-import { createSeed, type SeedData, type SeedKind } from './seed'
+import { createSeed, type SeedData, type SeedKind, type TaskLabelLink } from './seed'
 
 /* Records are held already in wire shape — ISO strings, camelCase, nullable rather
    than optional — so there is no mapping layer that could drift from the real
@@ -79,6 +79,20 @@ export function filterTasks(tasks: TaskResponse[], query: TaskSearchQuery): Task
   })
 }
 
+/** Fresh per read, mirroring SearchTasksHandler's batched join lookup rather than a stored field. */
+export function labelsForTask(store: MockStore, taskId: string): LabelResponse[] {
+  const labelIds = new Set(
+    store.data.taskLabels.filter((link) => link.taskId === taskId).map((link) => link.labelId),
+  )
+  return store.data.labels
+    .filter((label) => labelIds.has(label.id))
+    .sort(byCreatedThenId)
+}
+
+export function withLabels(store: MockStore, task: TaskResponse): TaskResponse {
+  return { ...task, labels: labelsForTask(store, task.id) }
+}
+
 export class MockStore {
   data: SeedData
   readonly nextId = createIdFactory(0xf00d)
@@ -105,5 +119,13 @@ export class MockStore {
 
   findTask(id: string) {
     return this.data.tasks.find((task) => task.id === id)
+  }
+
+  findLabel(id: string) {
+    return this.data.labels.find((label) => label.id === id)
+  }
+
+  findTaskLabel(taskId: string, labelId: string): TaskLabelLink | undefined {
+    return this.data.taskLabels.find((link) => link.taskId === taskId && link.labelId === labelId)
   }
 }

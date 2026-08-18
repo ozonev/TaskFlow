@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TaskFlow.Application.Abstractions;
+using TaskFlow.Domain.Labels;
 using TaskFlow.Domain.Projects;
 using TaskFlow.Domain.TaskItems;
 using TaskFlow.Infrastructure;
@@ -23,6 +24,8 @@ public sealed class TaskRepositorySearchTests(TaskFlowApiFactory factory) : ICla
     {
         using var scope = factory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>();
+        await context.TaskLabels.ExecuteDeleteAsync(Ct);
+        await context.Labels.ExecuteDeleteAsync(Ct);
         await context.Tasks.ExecuteDeleteAsync(Ct);
         await context.Projects.ExecuteDeleteAsync(Ct);
     }
@@ -47,6 +50,24 @@ public sealed class TaskRepositorySearchTests(TaskFlowApiFactory factory) : ICla
         context.Tasks.Add(task);
         await context.SaveChangesAsync(Ct);
         return task;
+    }
+
+    private async Task<Guid> SeedLabelAsync(Guid projectId, string name)
+    {
+        using var scope = factory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>();
+        var label = Label.Create(projectId, name);
+        context.Labels.Add(label);
+        await context.SaveChangesAsync(Ct);
+        return label.Id;
+    }
+
+    private async Task AssignLabelAsync(Guid taskId, Guid labelId)
+    {
+        using var scope = factory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TaskFlowDbContext>();
+        context.TaskLabels.Add(TaskLabel.Create(taskId, labelId));
+        await context.SaveChangesAsync(Ct);
     }
 
     private async Task<IReadOnlyList<TaskItem>> SearchAsync(TaskSearchFilter filter)
@@ -166,6 +187,54 @@ public sealed class TaskRepositorySearchTests(TaskFlowApiFactory factory) : ICla
 
         var task = Assert.Single(results);
         Assert.Equal(projectA, task.ProjectId);
+    }
+
+    [Fact]
+    public async Task SearchAsync_FiltersByLabel_LabelOnly()
+    {
+        var projectId = await SeedProjectAsync();
+        var labelId = await SeedLabelAsync(projectId, "Urgent");
+        var labeled = await SeedTaskAsync(projectId, "Labeled");
+        await SeedTaskAsync(projectId, "Unlabeled");
+        await AssignLabelAsync(labeled.Id, labelId);
+
+        var results = await SearchAsync(NoFilter with { LabelId = labelId });
+
+        var task = Assert.Single(results);
+        Assert.Equal("Labeled", task.Title);
+    }
+
+    [Fact]
+    public async Task SearchAsync_FiltersByStatusAndLabel_Combined()
+    {
+        var projectId = await SeedProjectAsync();
+        var labelId = await SeedLabelAsync(projectId, "Urgent");
+        var matching = await SeedTaskAsync(projectId, "Matches both");
+        var labelOnly = await SeedTaskAsync(projectId, "Label only");
+        await AssignLabelAsync(matching.Id, labelId);
+        await AssignLabelAsync(labelOnly.Id, labelId);
+
+        var results = await SearchAsync(NoFilter with { Status = TaskItemStatus.Todo, LabelId = labelId });
+
+        // Every seeded task is Todo, so this proves both predicates apply rather than
+        // either alone (a broken AND would still return exactly one of these two).
+        Assert.Equal(2, results.Count);
+    }
+
+    [Fact]
+    public async Task SearchAsync_FiltersByLabel_ExcludesTasksFromOtherProjects()
+    {
+        var projectA = await SeedProjectAsync();
+        var projectB = await SeedProjectAsync();
+        var labelId = await SeedLabelAsync(projectA, "Urgent");
+        var taskOnA = await SeedTaskAsync(projectA, "On A");
+        await SeedTaskAsync(projectB, "On B");
+        await AssignLabelAsync(taskOnA.Id, labelId);
+
+        var results = await SearchAsync(NoFilter with { LabelId = labelId });
+
+        var task = Assert.Single(results);
+        Assert.Equal("On A", task.Title);
     }
 
     [Fact]

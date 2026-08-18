@@ -4,8 +4,10 @@ import type {
   AuditLogResponse,
   CommentResponse,
   CreateCommentBody,
+  CreateLabelBody,
   CreateProjectBody,
   CreateTaskBody,
+  LabelResponse,
   ListProjectsQuery,
   ListProjectTasksQuery,
   Paged,
@@ -97,6 +99,7 @@ export function createHttpClient({ baseUrl }: HttpClientOptions): TaskFlowClient
           title: query.title,
           dueDateFrom: query.dueDateFrom,
           dueDateTo: query.dueDateTo,
+          labelId: query.labelId,
           page: query.page,
           pageSize: query.pageSize,
         })}`,
@@ -130,6 +133,26 @@ export function createHttpClient({ baseUrl }: HttpClientOptions): TaskFlowClient
 
     listTaskAudit(taskId: string, options?: RequestOptions) {
       return request<AuditLogResponse[]>(baseUrl, `/tasks/${taskId}/audit`, options)
+    },
+
+    listLabels(projectId: string, options?: RequestOptions) {
+      return request<LabelResponse[]>(baseUrl, `/projects/${projectId}/labels`, options)
+    },
+
+    createLabel(projectId: string, body: CreateLabelBody, options?: RequestOptions) {
+      return request<LabelResponse>(baseUrl, `/projects/${projectId}/labels`, {
+        ...options,
+        method: 'POST',
+        body,
+      })
+    },
+
+    assignLabel(taskId: string, labelId: string, options?: RequestOptions) {
+      return request<TaskResponse>(baseUrl, `/tasks/${taskId}/labels`, {
+        ...options,
+        method: 'POST',
+        body: { labelId },
+      })
     },
   }
 }

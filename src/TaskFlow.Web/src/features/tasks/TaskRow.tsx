@@ -37,6 +37,9 @@ export function TaskRow({ task, isActive }: { task: TaskResponse; isActive: bool
       </td>
       <td>
         <Tag>{task.status}</Tag>
+        {task.labels.map((label) => (
+          <Tag key={label.id}>{label.name}</Tag>
+        ))}
       </td>
       <td>
         {task.dueDate ? (

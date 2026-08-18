@@ -16,6 +16,8 @@ public sealed record SearchTasksRequest
     [MaxLength(TaskItem.TitleMaxLength)]
     public string? Title { get; init; }
 
+    public Guid? LabelId { get; init; }
+
     [Range(1, int.MaxValue)]
     public int Page { get; init; } = 1;
 

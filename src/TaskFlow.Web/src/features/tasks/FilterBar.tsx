@@ -2,7 +2,7 @@ import { useRef } from 'react'
 
 import { useShortcut } from '../../shortcuts/useShortcut'
 import { Select } from '../../ui/Select'
-import { PlannedLabelFilter } from './PlannedLabelFilter'
+import { LabelFilter } from './LabelFilter'
 import type { TaskFiltersApi } from './useTaskFilters'
 import styles from './FilterBar.module.css'
 
@@ -13,8 +13,8 @@ const STATUS_OPTIONS = [
   { value: 'Todo', label: 'Todo' },
 ]
 
-/** §4 — search, status select, due-date range, disabled label control. */
-export function FilterBar({ filters }: { filters: TaskFiltersApi }) {
+/** §4 — search, status select, due-date range, label select. */
+export function FilterBar({ projectId, filters }: { projectId: string; filters: TaskFiltersApi }) {
   const searchRef = useRef<HTMLInputElement>(null)
 
   // §6 line 129 — `/` focuses the search field. Registered here, not in
@@ -81,7 +81,7 @@ export function FilterBar({ filters }: { filters: TaskFiltersApi }) {
         />
       </div>
 
-      <PlannedLabelFilter />
+      <LabelFilter projectId={projectId} filters={filters} />
     </div>
   )
 }

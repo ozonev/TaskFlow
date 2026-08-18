@@ -1,6 +1,7 @@
 import type {
   AuditLogResponse,
   CommentResponse,
+  LabelResponse,
   ProjectResponse,
   TaskResponse,
 } from '../types'
@@ -20,11 +21,18 @@ import { createIdFactory } from './ids'
    Due dates are computed from a `now` argument rather than hardcoded, so the
    groups stay meaningful as time passes and tests can pin the clock. */
 
+export interface TaskLabelLink {
+  taskId: string
+  labelId: string
+}
+
 export interface SeedData {
   projects: ProjectResponse[]
   tasks: TaskResponse[]
   comments: CommentResponse[]
   auditLogs: AuditLogResponse[]
+  labels: LabelResponse[]
+  taskLabels: TaskLabelLink[]
 }
 
 export type SeedKind = 'default' | 'empty' | 'large'
@@ -47,18 +55,21 @@ function createdAgo(now: Date, minutesAgo: number): string {
 
 export function createSeed(kind: SeedKind, now: Date = new Date()): SeedData {
   if (kind === 'empty') {
-    return { projects: [], tasks: [], comments: [], auditLogs: [] }
+    return { projects: [], tasks: [], comments: [], auditLogs: [], labels: [], taskLabels: [] }
   }
 
   const nextProjectId = createIdFactory(0x9701)
   const nextTaskId = createIdFactory(0x7a5c)
   const nextCommentId = createIdFactory(0xc077)
   const nextAuditId = createIdFactory(0xa0d1)
+  const nextLabelId = createIdFactory(0x1abe1)
 
   const projects: ProjectResponse[] = []
   const tasks: TaskResponse[] = []
   const comments: CommentResponse[] = []
   const auditLogs: AuditLogResponse[] = []
+  const labels: LabelResponse[] = []
+  const taskLabels: TaskLabelLink[] = []
 
   function addProject(name: string, description: string | null, minutesAgo: number): string {
     const id = nextProjectId()
@@ -91,6 +102,9 @@ export function createSeed(kind: SeedKind, now: Date = new Date()): SeedData {
       status: 'Todo',
       dueDate,
       createdAtUtc: createdAgo(now, minutesAgo),
+      // Always recomputed from taskLabels at read time (see store.ts's withLabels) — this
+      // placeholder only needs to satisfy the type.
+      labels: [],
     })
     /* Most tasks carry a TaskCreated row, matching what the API writes today.
        A couple deliberately do not — standing in for rows created before audit
@@ -130,6 +144,16 @@ export function createSeed(kind: SeedKind, now: Date = new Date()): SeedData {
     })
   }
 
+  function addLabel(projectId: string, name: string, minutesAgo: number): string {
+    const id = nextLabelId()
+    labels.push({ id, projectId, name, createdAtUtc: createdAgo(now, minutesAgo) })
+    return id
+  }
+
+  function assignLabel(taskId: string, labelId: string): void {
+    taskLabels.push({ taskId, labelId })
+  }
+
   if (kind === 'large') {
     // 45 projects → 3 pages at the default page size of 20.
     for (let i = 1; i <= 45; i += 1) {
@@ -139,7 +163,7 @@ export function createSeed(kind: SeedKind, now: Date = new Date()): SeedData {
         (46 - i) * 60,
       )
     }
-    return { projects, tasks, comments, auditLogs }
+    return { projects, tasks, comments, auditLogs, labels, taskLabels }
   }
 
   const redesign = addProject(
@@ -220,7 +244,15 @@ export function createSeed(kind: SeedKind, now: Date = new Date()): SeedData {
   )
   addComment(copyTask, 'Priya Raman', 'Second paragraph can go entirely.', 60 * 2)
 
+  // A couple of labels on one project, with one task carrying both — reachable
+  // without any code edit or special query param, per this file's own convention.
+  const designLabel = addLabel(redesign, 'Design', 60 * 24 * 25)
+  const urgentLabel = addLabel(redesign, 'Urgent', 60 * 24 * 24)
+  assignLabel(contrastTask, designLabel)
+  assignLabel(contrastTask, urgentLabel)
+  assignLabel(copyTask, designLabel)
+
   void mobile // intentionally has no tasks
 
-  return { projects, tasks, comments, auditLogs }
+  return { projects, tasks, comments, auditLogs, labels, taskLabels }
 }

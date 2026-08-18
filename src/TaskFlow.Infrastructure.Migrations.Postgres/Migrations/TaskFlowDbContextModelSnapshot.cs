@@ -53,6 +53,53 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
+            modelBuilder.Entity("TaskFlow.Domain.Labels.Label", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "NameNormalized")
+                        .IsUnique();
+
+                    b.ToTable("Labels", (string)null);
+                });
+
+            modelBuilder.Entity("TaskFlow.Domain.Labels.TaskLabel", b =>
+                {
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("LabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TaskId", "LabelId");
+
+                    b.HasIndex("LabelId");
+
+                    b.ToTable("TaskLabels", (string)null);
+                });
+
             modelBuilder.Entity("TaskFlow.Domain.Projects.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -144,6 +191,30 @@ namespace TaskFlow.Infrastructure.Migrations.Postgres.Migrations
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("TaskFlow.Domain.Labels.Label", b =>
+                {
+                    b.HasOne("TaskFlow.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TaskFlow.Domain.Labels.TaskLabel", b =>
+                {
+                    b.HasOne("TaskFlow.Domain.Labels.Label", null)
+                        .WithMany()
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TaskFlow.Domain.TaskItems.TaskItem", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TaskFlow.Domain.TaskComments.TaskComment", b =>

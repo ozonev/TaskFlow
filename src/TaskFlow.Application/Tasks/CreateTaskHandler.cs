@@ -32,6 +32,7 @@ public sealed class CreateTaskHandler(
             await auditLogRepository.AddAsync(auditLog, ct);
         }, cancellationToken);
 
-        return new TaskDto(task.Id, task.ProjectId, task.Title, task.Description, task.Status, task.DueDate, task.CreatedAtUtc);
+        return new TaskDto(
+            task.Id, task.ProjectId, task.Title, task.Description, task.Status, task.DueDate, task.CreatedAtUtc, []);
     }
 }

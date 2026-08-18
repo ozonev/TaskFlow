@@ -48,6 +48,53 @@ namespace TaskFlow.Infrastructure.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
+            modelBuilder.Entity("TaskFlow.Domain.Labels.Label", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "NameNormalized")
+                        .IsUnique();
+
+                    b.ToTable("Labels", (string)null);
+                });
+
+            modelBuilder.Entity("TaskFlow.Domain.Labels.TaskLabel", b =>
+                {
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("LabelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("TaskId", "LabelId");
+
+                    b.HasIndex("LabelId");
+
+                    b.ToTable("TaskLabels", (string)null);
+                });
+
             modelBuilder.Entity("TaskFlow.Domain.Projects.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -139,6 +186,30 @@ namespace TaskFlow.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("TaskFlow.Domain.Labels.Label", b =>
+                {
+                    b.HasOne("TaskFlow.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TaskFlow.Domain.Labels.TaskLabel", b =>
+                {
+                    b.HasOne("TaskFlow.Domain.Labels.Label", null)
+                        .WithMany()
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TaskFlow.Domain.TaskItems.TaskItem", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TaskFlow.Domain.TaskComments.TaskComment", b =>

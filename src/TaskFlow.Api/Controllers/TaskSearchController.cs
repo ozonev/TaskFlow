@@ -24,7 +24,8 @@ public sealed class TaskSearchController(
             request.Status,
             request.DueDateFrom,
             request.DueDateTo,
-            request.Title);
+            request.Title,
+            request.LabelId);
 
         var result = await searchHandler.HandleAsync(
             new SearchTasksQuery(filter, request.Page, request.PageSize),

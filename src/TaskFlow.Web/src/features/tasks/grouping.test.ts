@@ -13,6 +13,7 @@ function task(id: string, dueDate: string | null): TaskResponse {
     status: 'Todo',
     dueDate,
     createdAtUtc: '2026-01-01T00:00:00.000Z',
+    labels: [],
   }
 }
 

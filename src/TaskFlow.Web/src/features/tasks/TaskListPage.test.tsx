@@ -116,24 +116,27 @@ describe('TaskListPage', () => {
     })
   })
 
-  describe('the planned label control (§3 line 80, §12 line 238)', () => {
-    it('is aria-disabled, focusable, issues no request, and never enters the query string', async () => {
+  describe('the label filter (§3 line 80, replacing the capstone-era mock)', () => {
+    it('selecting a label pushes ?label=, narrows the results, and clearing removes both', async () => {
       const user = userEvent.setup()
-      const { client, router } = renderApp(`/projects/${REDESIGN_ID}`)
+      const { router } = renderApp(`/projects/${REDESIGN_ID}`)
       await screen.findByRole('table')
+      expect(await screen.findByText('Audit existing page templates')).toBeInTheDocument()
 
-      const control = screen.getByRole('button', { name: /Any label/ })
-      expect(control).toHaveAttribute('aria-disabled', 'true')
+      await user.selectOptions(screen.getByLabelText('Label'), 'Design')
 
-      control.focus()
-      expect(control).toHaveFocus()
+      expect(router.state.location.search).toContain('label=')
+      await waitFor(() =>
+        expect(screen.queryByText('Audit existing page templates')).not.toBeInTheDocument(),
+      )
+      // Both tasks the default seed assigns the Design label to are still shown.
+      expect(screen.getByText('Fix colour contrast failures in the type scale')).toBeInTheDocument()
+      expect(screen.getByText('Rewrite the homepage hero copy')).toBeInTheDocument()
 
-      const callsBefore = client.calls.length
-      await user.click(control)
-      await user.keyboard('{Enter}')
+      await user.selectOptions(screen.getByLabelText('Label'), 'Any label')
 
-      expect(client.calls.length).toBe(callsBefore)
-      expect(router.state.location.search).not.toContain('label')
+      expect(router.state.location.search).not.toContain('label=')
+      expect(await screen.findByText('Audit existing page templates')).toBeInTheDocument()
     })
   })
 

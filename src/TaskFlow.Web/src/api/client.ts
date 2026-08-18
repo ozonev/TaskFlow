@@ -2,8 +2,10 @@ import type {
   AuditLogResponse,
   CommentResponse,
   CreateCommentBody,
+  CreateLabelBody,
   CreateProjectBody,
   CreateTaskBody,
+  LabelResponse,
   ListProjectsQuery,
   ListProjectTasksQuery,
   Paged,
@@ -48,4 +50,12 @@ export interface TaskFlowClient {
   ): Promise<CommentResponse>
 
   listTaskAudit(taskId: string, options?: RequestOptions): Promise<AuditLogResponse[]>
+
+  listLabels(projectId: string, options?: RequestOptions): Promise<LabelResponse[]>
+  createLabel(
+    projectId: string,
+    body: CreateLabelBody,
+    options?: RequestOptions,
+  ): Promise<LabelResponse>
+  assignLabel(taskId: string, labelId: string, options?: RequestOptions): Promise<TaskResponse>
 }

@@ -1,3 +1,4 @@
+using TaskFlow.Application.Labels;
 using TaskFlow.Domain.TaskItems;
 
 namespace TaskFlow.Application.Tasks;
@@ -9,4 +10,5 @@ public sealed record TaskDto(
     string? Description,
     TaskItemStatus Status,
     DateTime? DueDate,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    IReadOnlyList<LabelDto> Labels);

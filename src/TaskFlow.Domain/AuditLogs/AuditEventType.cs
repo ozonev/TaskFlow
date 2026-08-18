@@ -5,4 +5,6 @@ public enum AuditEventType
     ProjectCreated,
     TaskCreated,
     TaskCommentAdded,
+    LabelCreated,
+    TaskLabelAssigned,
 }

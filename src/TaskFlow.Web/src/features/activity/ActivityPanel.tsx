@@ -10,6 +10,8 @@ const EVENT_LABELS: Record<string, string> = {
   ProjectCreated: 'Project created',
   TaskCreated: 'Task created',
   TaskCommentAdded: 'Comment added',
+  LabelCreated: 'Label created',
+  TaskLabelAssigned: 'Label assigned',
 }
 
 /**
